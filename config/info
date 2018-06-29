@@ -1,0 +1,6 @@
+{
+	"gitrepo": 	"git://github.com/ImperialCollegeLondon/minimaint/ubuntu-16.04",
+	"lsbid":   	"Ubuntu",
+	"lsbrelease":	"16.04",
+	"cachedir":	"/tmp/minimaint"
+}

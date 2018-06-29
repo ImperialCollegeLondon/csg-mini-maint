@@ -1,0 +1,494 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+minimaint
+
+=head1 SYNOPSIS
+
+minimaint [--configdir DIR] --list [other options]
+minimaint [--configdir DIR] [other script options] scriptname scriptname...
+
+=head1 DESCRIPTION
+
+Runs all the maint scripts, or just scriptnames provided (dropping the numeric
+prefix).  eg 'minimaint dist' runs the "dist" minimaint script.
+
+=head2 Options
+
+  --help||usage       - Display help screen
+  --configdir DIR     - read config from that dir (default: /etc/minimaint)
+  --[no]debug         - Print extra information
+  --[no]dry-run       - Don't really do stuff, just go through the motions
+  --[no]silent        - Don't print anything but warnings and errors
+  --[no]logperline    - Display log message one per line (default no)
+  --[no]colour        - Display log message with colour (default yes)
+  --[no]machineread   - Makes logs machine readable
+  --list              - Display all scriptnames and exit
+  --mode=boot
+         cron-15
+         cron-30
+         cron-60
+	 cron-0300hrs
+	 cron-0400hrs
+         install
+         manual          - Set the run "mode"
+  --trace=none|caller|stack
+                      - sets trace mode
+=cut
+
+# --- Compiler directives ---------------------------------------------------
+
+use strict;
+use warnings;
+use File::Spec;
+use File::Basename;
+use File::Slurp;
+use File::Path;
+use JSON;
+use Cwd qw(abs_path);
+use Data::Dumper;
+use Getopt::Long qw(:config gnu_getopt pass_through);
+
+# --- Constants -------------------------------------------------------------
+
+# DCW: THESE NEED TO MOVE INTO CONFIG OR BE DELETED...
+our $lsbrelease = '16.04';
+our $lsbid = 'Ubuntu';
+our $configdir = "/etc/minimaint";
+our %config;
+
+# --- Global variables ------------------------------------------------------
+
+# Computed later
+our $perllibpath;
+our $maintroot;
+our $_cachebasedir;
+
+our $perlbin = "/usr/bin/perl";
+our $scriptsubdir = 'maint';
+our $maintscriptfile = 'maint';
+our $scriptlock = 'maint-driver';
+
+# --- Subroutines -----------------------------------------------------------
+
+# Runs from BEGIN, which means even when syntax checking!
+# and of course, long before we're allowed to use maint features!
+sub loadconfig()
+{
+	unless( GetOptions('configdir=s' => \$configdir ) )
+	{
+		die "minimaint: bad --configdir option\n";
+	}
+	my $file = "$configdir/info";
+	my $text = read_file( $info ) ||
+		die "minimaint: can't slurp config file $file\n";
+	%config = { decode_json($text) };
+}
+
+
+# Tell the user how to use this tool.
+sub _usage
+{
+	print << "END";
+Options to maint:
+    --help|usage        - Print this screen
+    --script=scriptname - Run script (script is name minus numeric prefix)
+    --[no]debug         - Print extra information
+    --[no]dry-run       - Don't really do stuff, just go through the motions
+    --[no]silent        - Don't print anything but warnings and errors
+    --[no]logperline    - Display log message one per line (default no)
+    --[no]colour        - Display log message with colour (default yes)
+    --[no]machineread   - Makes logs machine readable
+    --list		- display all scriptnames and exit
+    --production	- Run maint from the production file-set, i.e.
+    			  from the latest maint revision-controled commit.
+    			  (This is the default.)
+    --development	- Run maint from the development file-set, i.e.
+    			  from the current central maint working tree.
+    --mode=boot
+           cron-15m
+           cron-30m
+           cron-60m
+	   cron-0300hrs
+	   cron-0400hrs
+           install
+	   manual          - Set the run "mode", which selects which scripts to run
+    --trace=none
+           caller
+	   stack        - (default none) sets trace mode
+END
+	exit 0;
+}
+
+# Synchronize our local cache from upstream via git
+# Runs from BEGIN, which means even when syntax checking!
+# and of course, long before we're allowed to use maint features!
+
+# Cache locations:
+#	/var/cache/minimaint/production
+
+# NOTE: This function is run before Sys::Maint facilities are available.
+# 	Standard Perl only!
+
+sub loadcache($$)
+{
+	# p_basedir: Path to the root of our maint tree, e.g. /vol/linux/ubuntu/16.04/.
+	# p_cachebasedir: Path to the root our local cache, e.g. /var/cache/minimaint/.
+	my ($p_basedir, $p_cachebasedir) = @_;
+
+	my $git = "/usr/bin/git";
+
+	# Sync our local git repository clone (blowing away what we've
+	# already got if it turns out that something funny has
+	# happened to upstream and we can't update simply.)
+
+	my $repodest = File::Spec->catdir ($p_cachebasedir, "production", $p_basedir);
+	unless ( -d $repodest )
+	{
+		mkpath([$repodest], 0, 0755);
+	}
+
+	-d $repodest || die "Cannot create directory $repodest\n";
+	-w $repodest || die "directory $repodest not writable!\n";
+
+	# URI for git clone
+	my $gitrepo = $config{GITSOURCE}."/ubuntu-$lsbrelease";
+
+	# If we don't have any local version of the repository at all,
+	# create a new clone.
+	unless( -e "$repodest/.git" )
+	{
+		print "Cloning maint repository to $repodest...\n";
+		my $ret = system("$git clone --depth 1 --quiet $gitrepo $repodest");
+		if( $ret )
+		{
+			# Clone failed.  Blow the destination target dir
+			# away, then try again.
+			fullclone();
+			print "Clone failed; retrying from first principles...\n";
+			system("rm -Rf $repodest");
+			mkpath([$repodest], 0, 0755);
+			chdir($repodest);
+			$ret = system("$git clone --depth 1 --quiet $gitrepo $repodest");
+			if ($ret) {
+				# Still failed. Manually update
+				# /sbin/maint via NFS, and abort.
+				print "Clone still failed; manually updating /sbin/maint via NFS as a last-ditch measure.\n";
+				system("cp /vol/linux/ubuntu/16.04/bin/maint /sbin/maint");
+				print "Perhaps the new 'maint' command has code to handle this error condition?\nTry running me again!\n";
+				return undef;
+			} else {
+				# Success! We have recovered.
+				return $repodest;
+			}
+		}
+		else      { return $repodest; }
+	}
+
+	# Update the current repository using a simple fast-forward strategy.
+	chdir($repodest);
+	my $ret = system("$git pull --quiet --ff-only");
+
+	if ($ret) {
+		# If the fast forward wasn't successful, blow the entire cache
+		# away and try a full clone.
+		print "Local maint cache was invalid, and could not be trivially updated.\n";
+		print "Refreshing from first principles...\n";
+		system("rm -Rf $p_cachebasedir/production");
+		mkpath([$repodest], 0, 0755);
+		chdir($repodest);
+		$ret = system("$git clone --depth 1 --quiet $gitrepo $repodest");
+		if ($ret) {
+			print "Clone still failed; manually updating /sbin/maint via NFS as a last-ditch measure.\n";
+			system("cp /vol/linux/ubuntu/16.04/bin/maint /sbin/maint");
+			print "Perhaps the new 'maint' command has code to handle this error condition?\nTry running me again!\n";
+			return undef;
+		}
+		else {
+			return $repodest;
+		}
+	}
+	else {
+		# Common case: the fast-forward was successful; carry on!
+		return $repodest;
+	}
+}
+
+
+# Check that we're running the version of the operating system that we should
+# be -- otherwise, abort post-haste!
+
+sub check_os_version()
+{
+	my $actual_id = `/usr/bin/lsb_release -i -s`;
+	chomp $actual_id;
+
+	my $actual_release = `/usr/bin/lsb_release -r -s`;
+	chomp $actual_release;
+
+	unless( $actual_id eq $lsbid && $actual_release eq $lsbrelease )
+	{
+		die "Local operating system is '$actual_id $actual_release', ".
+		    "not '$lsbid $lsbrelease'; aborting now\n".
+		    "to avoid clobbering things I don't understand!\n";
+	}
+}
+
+# Perform execution bootstrapping functions:
+#  - Compute $maintroot and $perllibpath,
+#  - Sync the local cache,
+#  - Load the Sys::Maint libaries from that cache.
+
+sub bootstrap() {
+	# Make sure we're sitting somewhere safe.
+	chdir("/");
+
+	# set up our PATH to make sure life is sane
+	$ENV{PATH} = '/bin:/sbin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin';
+	$_cachebasedir = "/var/cache/minimaint";
+
+	unless ( -d $_cachebasedir )
+	{
+		mkpath([$_cachebasedir], 0, 0755);
+	}
+
+	# If successful, this will return the path to some local cache, e.g.
+	# "/var/cache/minimaint/production/vol/linux/ubuntu/16.04/"
+	print "Syncing local cache...\n";
+	$maintroot = loadcache( $_cachebasedir);
+
+	unless ( defined $maintroot ) {
+		die "Local sync failed, and no valid cache available: aborting!\n";
+	}
+
+	$perllibpath = File::Spec->catdir($maintroot, 'lib', 'perl');
+
+	unshift(@INC, $perllibpath); # Cannot use "use lib" directly
+	require Sys::Maint; import Sys::Maint qw(:all);
+}
+
+# Prior to this point, we haven't been able to refer to *any* Sys::Maint functions or constants.
+# Let's check that we're running the correct OS, then run the bootstrap
+# sequence *right now* so that we can.
+
+BEGIN { loadconfig(); check_os_version(); bootstrap(); }
+
+# runscript (string:basedir, string:scriptname [,scriptargs...])
+#
+# Run a specific named maint-script as identified by it's script directory.
+
+sub runscript
+{
+	my ($scriptdir, @args) = @_;
+	unless( -d $scriptdir )
+	{
+		maint_log(LOG_WARNING, "directory $scriptdir doesn't exist");
+		return 0;
+	}
+	my $scriptfile = "$scriptdir/$maintscriptfile";
+	unless( -f $scriptfile && -x $scriptfile )
+	{
+		maint_log(LOG_WARNING, "script file $scriptfile doesn't exist or isn't executeable - skipping");
+		return 0;
+	}
+	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
+	$nocrashonerr = 1 if maint_testmode('install');
+
+	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptfile, @args],
+		undef, $nocrashonerr, undef, \*STDOUT, \*STDERR);
+	return 1;
+}
+
+# Index all the scripts that we have available.
+sub findscripts()
+{
+	my @results = ();
+	my %seen = ();
+	my $scriptdir = maint_mkrootpath($maintroot, $scriptsubdir);
+
+	# Scan the directory
+	maint_log(LOG_DEBUG, "Opening script directory $scriptdir");
+	unless (opendir(DIR, $scriptdir))
+	{
+		maint_log(LOG_ERR, "Cannot open directory $scriptdir for reading");
+	}
+	foreach my $reld (readdir(DIR))
+	{
+		if ($reld =~ m/^\./) # Ignore anything beginning with .
+		{
+			maint_log(LOG_DEBUG, "Ignoring $reld");
+			next;
+		}
+		my $d = maint_mkrootpath($scriptdir, $reld);
+		next unless -d $d;          # Ignore non directories
+		maint_log(LOG_DEBUG, "Looking at directory $d");
+		if ($reld =~ m/^(\d+)([[:alpha:]\-_]+)$/)
+		{
+			my $num  = 0 + $1;
+			my $base = $2;
+			maint_log(LOG_DEBUG, "Found maint dir $d, number=$num, base=$base");
+			if (exists $seen{$base})
+			{
+				maint_log(LOG_WARNING,
+"You have more than one maint script with the same base name - conflicting script is called $reld - skipping"
+				);
+				next;
+			}
+			push @results,
+				{ num => $num, dir => $d, base => $base };
+			$seen{$base}++;
+		}
+		else
+		{
+			maint_log(LOG_WARNING,
+"Maint directory $d has invalid form, ignoring. To enable, make sure it matches \\d+[[:alpha:]]+"
+			);
+		}
+	}
+	close DIR;
+	return @results;
+}
+
+# --- Main program ----------------------------------------------------------
+
+our @scripts = ();    	  # Which scripts to run?
+
+my $host       = undef;   # Implies local host
+my %scriptdirs = ();      # Global for passing set of scripts around
+my @origargv  = @ARGV;
+my @classlist = ();
+
+# Process the generic options
+maint_initarg();             # @ARGV contains remaining args only
+
+# process command line args
+{
+	unless (GetOptions('configdir=s' => \$configdir ) && @ARGV )
+	{
+		_usage();        # and exit
+	}
+	my @scripts = @ARGV;
+
+	# Put back script args
+	@ARGV = ();
+	maint_pushargs();
+}
+
+maint_log( LOG_DEBUG, "scripts to run: ". join(' ',@scripts) ) if @scripts;
+
+# Check if root.
+{
+	if ($> != 0)
+	{
+		my $progname   = $0;
+		my $thisscript = File::Spec->rel2abs($0);
+		maint_runcmd([maint_mkrootpath('usr', 'bin', 'ksu'), '-e', $thisscript, @origargv], undef, undef, \*STDIN, \*STDOUT, \*STDERR);
+		exit 0;
+	}
+}
+
+# Init logging
+maint_setlogging();
+maint_initlog("maint system in $_cachebasedir (production mode)");
+
+# Reload cached class data
+maint_lockname($scriptlock);
+maint_log( LOG_ERR, 'Cannot get lock, aborting' ) unless maint_setlock();
+maint_reloadclasses(1);
+@classlist = maint_listclasses();
+maint_clearlock();
+
+my @scriptinfo = findscripts();
+
+# DCW: list mode.
+if( maint_getattr( "list" ) == 1 )
+{
+	#maint_log( LOG_WARNING, "DCW: list mode" );
+
+	# Scan all scripts
+	foreach my $sc (@scriptinfo)
+	{
+		my $num = $sc->{num};
+		my $base = $sc->{base};
+		print "maint script: $num $base\n";
+	}
+	maint_closelog();
+	exit(0);
+}
+
+# Otherwise, run desired scripts (if allowed)
+{
+	my %requestedscripts = map { $_ => 1 } @scripts;
+
+	foreach my $sc (@scriptinfo)
+	{
+		my $num = $sc->{num};
+		my $base = $sc->{base};
+		my $d = $sc->{dir};
+
+		maint_log(LOG_DEBUG, "Found maint dir $d, number=$num, base=$base");
+		$scriptdirs{$num} = { dir => $d, base => $base, run => 0 };
+		if (@scripts == 0 || exists $requestedscripts{$base})
+		{
+			# We want to run this
+			$scriptdirs{$num}->{run} = 1;
+			delete $requestedscripts{$base};    # Got it
+		}
+
+		# Now check request to run would be negated
+		# by skipwhen or runon constraints
+		unless (maint_runwhen($d, maint_getattr('mode')))
+		{
+			maint_log(LOG_DEBUG, "Skipping $base due to skipwhen/ constraint");
+			$scriptdirs{$num}->{run} = 0;
+		}
+		unless (maint_checkrunon($d, \@classlist))
+		{
+			maint_log(LOG_DEBUG, "Skipping $base due to runon/ constraint");
+			$scriptdirs{$num}->{run} = 0;
+		}
+	}
+	foreach my $t (sort keys %requestedscripts)
+	{
+		maint_log(LOG_WARNING, "Requested script $t does not exist - ignoring");
+	}
+}
+
+# Run all requested on local machine
+{
+	# Note, numeric sorting, not string order
+	my @scripts = sort { $a <=> $b } keys %scriptdirs;
+
+	# Generate list of scripts that will be run and announce.
+	my $lists = join(",",
+		map { $scriptdirs{$_}->{base} }
+			grep { $scriptdirs{$_}->{run} } @scripts);
+	maint_log(LOG_WARNING, "about to run $lists");
+
+#	maint_lognewline();
+	foreach my $k ( @scripts )
+	{
+		if ($scriptdirs{$k}->{run})
+		{
+			runscript($scriptdirs{$k}->{dir}, @ARGV);
+		}
+	}
+}
+maint_closelog();
+exit;
+
+=head1 AUTHORS
+
+Duncan White E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson E<lt>mwj@doc.ic.ac.ukE<gt>,
+David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
+Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
+Tim Southerwood, E<lt>ts@dionic.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003-2018 Department of Computing, Imperial College London
+
+=cut

@@ -1,0 +1,53 @@
+JUNE 2018
+
+I had a dream..
+
+.. but rather sadly, it was about maint:-)
+
+I wondered if one could pull out a small neat non-DoC specific
+subset of maint out of the 41000 (!) line behemoth it's become,
+and show it to others, talk about it, and use it for DoC purposes
+outside of 146.169..
+
+So I thought I'd play...
+
+The core principles must be:
+
+3 components:
+
+- the source code, /sbin/maint, the libraries and all the maint scripts
+  (reengineered to have NO DoC specific knowledge in them, no use of
+  NFS, rsynclinux.doc.ic.ac.uk, db-admin database etc).  Store this in a
+  public git repo..
+
+- DoC specific config information currently embedded in the code, plus
+  assumptions like "every hostname is in .doc.ic.ac.uk", per-maint script
+  runon and runwhen data, plus per-maint script config data eg. the dist
+  tree, the apt package lists, the database config files etc etc.  Store
+  this in an /etc/maint directory, getting it from a separate git repo,
+  not so public, but accessible to DoC machines outside of 146.169:-)
+
+- To replace db-admin, needs more thought, on one level this is more DoC
+  specific information, specifically a set of users, groups (and members),
+  and hostclasses.  However, this data changes more rapidly than most config
+  data (that's why it's in a database:-)).  Perhaps hostclasses could
+  permanently leave the database, maybe even users, groups and members.
+  I wondered whether all this data could be downloaded in bulk from a
+  RESTful API, in JSON format. Alternatively, it could be automatically
+  generated (in our case FROM db-admin) as a small number of JSON files
+  every N minutes (say once an hour), automatically added to the config repo
+  and pushed, making it live.
+
+The basic idea will be to COPY small bits of maint and it's libraries in
+here, separate out the config from the source code, delete as much as
+possible, clean and "refactor" it as much as possible.  Let's see what
+we come up with.
+
+INITIAL GOALS:
+
+1). maint dist
+2). maint aptitude
+3). maint useraccounts
+
+	duncan white
+	June 2018
