@@ -53,16 +53,14 @@ use Getopt::Long qw(:config gnu_getopt pass_through);
 
 # --- Constants -------------------------------------------------------------
 
-# DCW: THESE NEED TO MOVE INTO CONFIG OR BE DELETED...
-our %config;
+our %config;			# our configuration info
+
+# bits of the config, pulled out for convenience..
 
 our $gitrepo;			# URL of git repo containing the source
 our $lsbid;			# which distro (eg Ubuntu)
 our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $cachedir;			# where to store local src eg /var/cache/minimaint
-
-our $git = "/usr/bin/git";
-
 
 # --- Global variables ------------------------------------------------------
 
@@ -105,17 +103,18 @@ sub loadconfig()
 
 
 #
-# fullclone( $giturl, $repodest );
+# fullclone( $git, $giturl, $repodest );
 #	blow the destination target dir away, fresh clone.
 #
-sub fullclone ($$)
+sub fullclone ($$$)
 {
-	my( $giturl, $repodest ) = @_;
+	my( $git, $giturl, $repodest ) = @_;
 
 	print "Clone failed; retrying from first principles...\n";
 	system("rm -rf $repodest");
 	mkpath([$repodest], 0, 0755);
 	chdir($repodest);
+
 	system("$git clone --depth 1 --quiet $giturl $repodest") == 0 ||
 		die "Clone still failed, failed\n";
 }
@@ -144,28 +143,22 @@ sub loadcache ($$)
 	-d $repodest || die "Cannot create directory $repodest\n";
 	-w $repodest || die "directory $repodest not writable!\n";
 
+	my $git = "/usr/bin/git";
+
 	# If we don't have any local version of the repository at all,
 	# create a new clone.
 	unless( -e "$repodest/.git" )
 	{
 		print "Cloning maint repository to $repodest...\n";
-		my $ret = system("$git clone --depth 1 --quiet $giturl $repodest");
-		if( $ret )
-		{
-			# Clone failed.  Go nuclear:
-			fullclone( $giturl, $repodest );
-		}
+		system("$git clone --depth 1 --quiet $giturl $repodest") == 0
+			|| fullclone( $git, $giturl, $repodest );
 	}
 
 	# Update the current repository using a simple fast-forward strategy.
 	chdir($repodest);
-	my $ret = system("$git pull --quiet --ff-only");
+	system("$git pull --quiet --ff-only") == 0
+		|| fullclone( $git, $giturl, $repodest );
 
-	if( $ret )
-	{
-		# If the fast forward wasn't successful, go nuclear:
-		fullclone( $giturl, $repodest );
-	}
 	return $repodest;
 }
 
@@ -219,8 +212,8 @@ sub bootstrap() {
 # Let's read in the config information, check that we're running the correct
 # OS, then run the bootstrap sequence *right now* so that we can.
 
-#BEGIN {
+BEGIN {
 loadconfig();
 check_os_version();
 bootstrap();
-#}
+}
