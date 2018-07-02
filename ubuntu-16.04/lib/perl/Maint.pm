@@ -44,8 +44,9 @@ use Maint::Log qw(:all);
 use Maint::Lock qw(:all);
 use Maint::Util qw(:all);
 use Maint::ScriptArgs qw(:all);
-#use Maint::SafeFile qw(:all);
-#use Maint::Class qw(:all);
+use Maint::ConfigInfo qw(:all);
+use Maint::HostClass qw(:all);
+use Maint::SafeFile qw(:all);
 #use Maint::Config qw(:all);
 #use Maint::DB qw(:all);
 
@@ -58,10 +59,9 @@ INIT
 		Maint::Lock->export_to_level(1,       __PACKAGE__, ':all');
 		Maint::Util->export_to_level(1,       __PACKAGE__, ':all');
 		Maint::ScriptArgs->export_to_level(1, __PACKAGE__, ':all');
-		#Maint::SafeFile->export_to_level(1,   __PACKAGE__, ':all');
-		#Maint::Class->export_to_level(1,      __PACKAGE__, ':all');
-		#Maint::Config->export_to_level(1,     __PACKAGE__, ':all');
-		#Maint::DB->export_to_level(1,         __PACKAGE__, ':all');
+		Maint::ConfigInfo->export_to_level(1, __PACKAGE__, ':all');
+		Maint::HostClass->export_to_level(1,  __PACKAGE__, ':all');
+		Maint::SafeFile->export_to_level(1,   __PACKAGE__, ':all');
 	}
 }
 
@@ -255,9 +255,10 @@ END
 
 =head1 AUTHORS
 
-Duncan White E<lt>dcw@imperial.ac.ukE<gt>,
-Lloyd Kamara E<lt>ldk@imperial.ac.ukE<gt>,
-Matt Johnson E<lt>mwj@doc.ic.ac.ukE<gt>,
+Duncan White  E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara  E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson  E<lt>mwj@doc.ic.ac.ukE<gt>,
+Don Riden     E<lt>driden@doc.ic.ac.ukE<gt>,
 David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
 Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
 Tim Southerwood, E<lt>ts@dionic.netE<gt>

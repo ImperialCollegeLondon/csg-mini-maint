@@ -1,6 +1,12 @@
 {
 	"gitrepo": 	"git@github.com:ImperialCollegeLondon/csg-mini-maint.git",
-	"lsbid":   	"Ubuntu",
-	"lsbrelease":	"16.04",
-	"cachedir":	"/tmp/minimaint"
+	"lsbid":   		"Ubuntu",
+	"lsbrelease":		"16.04",
+	"hostclass:source":	"file:hostclass",
+	"hostclass:file":	"/tmp/hostclass",
+	"cachedir":		"/tmp/minimaint",
+	"lockdir":		"/tmp/minimaint.lock",
+	"rundir":		"/tmp/minimaint.run",
+	"hello:runwhen":	"boot,cron-60m",
+	"hello:runon":		"ALLHOSTS"
 }

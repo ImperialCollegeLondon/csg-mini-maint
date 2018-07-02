@@ -198,7 +198,7 @@ Tim Southerwood E<lt>ts@dionic.netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright 2003-2008 Department of Computing, Imperial College London
+Copyright 2003-2018 Department of Computing, Imperial College London
 
 =cut
 

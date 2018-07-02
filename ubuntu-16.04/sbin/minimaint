@@ -18,14 +18,14 @@ or $ENV{MM_CONFIG_DIR} if it's set.
 
 =head2 Options
 
-  --help||usage       - Display help screen
+  --list              - Display all scriptnames and exit
+  --help|usage        - Display help screen
   --[no]debug         - Print extra information
   --[no]dry-run       - Don't really do stuff, just go through the motions
   --[no]silent        - Don't print anything but warnings and errors
   --[no]logperline    - Display log message one per line (default no)
   --[no]colour        - Display log message with colour (default yes)
   --[no]machineread   - Makes logs machine readable
-  --list              - Display all scriptnames and exit
   --mode=boot
          cron-15
          cron-30
@@ -42,10 +42,9 @@ or $ENV{MM_CONFIG_DIR} if it's set.
 
 use strict;
 use warnings;
-use File::Spec;
 use File::Basename;
 use File::Slurp;
-use File::Path;
+#use File::Path;
 use JSON;
 use Cwd qw(abs_path);
 use Data::Dumper;
@@ -61,6 +60,7 @@ our $gitrepo;			# URL of git repo containing the source
 our $lsbid;			# which distro (eg Ubuntu)
 our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $cachedir;			# where to store local src eg /var/cache/minimaint
+our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
 my $git = "/usr/bin/git";
 
@@ -70,6 +70,7 @@ my $git = "/usr/bin/git";
 # Computed later
 our $perllibpath;
 our $maintroot;
+our $configdir;
 
 our $perlbin = "/usr/bin/perl";
 our $scriptsubdir = 'maintscripts';
@@ -88,7 +89,7 @@ our $scriptlock = 'maint-driver';
 #
 sub loadconfig()
 {
-	my $configdir = "/etc/minimaint";
+	$configdir = "/etc/minimaint";
 	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
 	my $file = "$configdir/info";
 	my $text = read_file( $file ) ||
@@ -101,6 +102,7 @@ sub loadconfig()
 	$lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
 	$lsbrelease = $config{lsbrelease} ||
 		die "minimaint: no config lsbrelease\n";
+	$distribution = lc("$lsbid-$lsbrelease");
 	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
 }
 
@@ -190,15 +192,12 @@ sub bootstrap()
 
 	# set up our PATH to make sure life is sane
 	$ENV{PATH} = '/bin:/sbin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin';
-	unless( -d $cachedir )
-	{
-		mkpath( [$cachedir], 0, 0755);
-	}
+	mkpath( [$cachedir], 0, 0755) unless -d $cachedir;
 
 	print "Syncing local cache...\n";
 	$maintroot = loadcache( $gitrepo, $cachedir );
 
-	$perllibpath = File::Spec->catdir( $maintroot, 'lib', 'perl' );
+	$perllibpath = "$maintroot/lib/perl";
 #
 	unshift(@INC, $perllibpath); # Cannot use "use lib" directly
 	unshift(@INC, "/vol/csg/public/users/dcw/git-projects/csg-mini-maint/ubuntu-16.04/lib/perl" );	# DCW.. temp, gross, hack
@@ -216,6 +215,8 @@ check_os_version();
 bootstrap();
 }
 
+# copy $configdir and %config into maint's inner depths..
+maint_setconfig( $configdir, \%config );
 
 #
 # runmaintscript( $scriptdir, @args );
@@ -253,7 +254,7 @@ sub findscripts()
 {
 	my @results = ();
 	my %seen = ();
-	my $scriptdir = "$maintroot/$scriptsubdir";
+	my $scriptdir = "$maintroot/$distribution/$scriptsubdir";
 
 	# Scan the directory
 	maint_log(LOG_DEBUG, "Opening script directory $scriptdir");
@@ -329,7 +330,7 @@ maint_initlog("maint system in $cachedir (production mode)");
 
 my @scriptinfo = findscripts();
 
-# DCW: list mode.
+# list mode: display the names of all maint scripts
 if( maint_getattr( "list" ) == 1 )
 {
 	#maint_log( LOG_WARNING, "DCW: list mode" );
@@ -341,9 +342,15 @@ if( maint_getattr( "list" ) == 1 )
 		my $base = $sc->{base};
 		print "maint script: $num $base\n";
 	}
+
 	maint_closelog();
 	exit(0);
 }
+
+my $cd = maint_getconfigdir();
+my $ch = maint_getconfig( "hostclass:source" );
+my $cf = maint_getconfig( "hostclass:file" );
+maint_log( LOG_WARNING, "debug: configdir=$cd, hostclass:source=$ch, hostclass:file=$cf" );
 
 # Reload cached class data
 maint_lockname($scriptlock);
@@ -352,8 +359,11 @@ maint_reloadclasses(1);
 @classlist = maint_listclasses();
 maint_clearlock();
 
-# Otherwise, run desired scripts (if allowed)
+# Run desired scripts (if allowed)
 my %requestedscripts = map { $_ => 1 } @scripts;
+
+maint_log( LOG_WARNING, "debug: want to run scripts @scripts" );
+maint_lognewline();
 
 foreach my $sc (@scriptinfo)
 {
@@ -370,40 +380,42 @@ foreach my $sc (@scriptinfo)
 		delete $requestedscripts{$base};    # Got it
 	}
 
-	# Now check request to run would be negated
-	# by skipwhen or runon constraints
-	unless( maint_runwhen($d, maint_getattr('mode')) )
+	# should we exclude any scripts due to runwhen/runon constraints?
+	my $scriptname = basename($d);
+	my $mode = maint_getattr('mode');
+	unless( maint_runwhen($scriptname, $mode) )
 	{
-		maint_log(LOG_DEBUG, "Skipping $base due to skipwhen/ constraint");
+		maint_log(LOG_WARNING, "Skipping $scriptname due to runwhen/ constraint");
+		maint_lognewline();
 		$scriptdirs{$num}->{run} = 0;
 	}
-	unless( maint_checkrunon($d, \@classlist ))
+	unless( maint_checkrunon($scriptname, \@classlist ))
 	{
-		maint_log(LOG_DEBUG, "Skipping $base due to runon/ constraint");
+		maint_log(LOG_WARNING, "Skipping $scriptname due to runon/ constraint");
+		maint_lognewline();
 		$scriptdirs{$num}->{run} = 0;
 	}
 }
 foreach my $t (sort keys %requestedscripts)
 {
-	maint_log(LOG_WARNING, "Requested script $t does not exist - ignoring");
+	maint_log(LOG_WARNING, "Ignoring non-existent script $t");
+	maint_lognewline();
 }
 
 # Run all requested on local machine
 # Note, numeric sorting, not string order
 @scripts = sort { $a <=> $b } keys %scriptdirs;
 
-# Generate list of scripts that will be run and announce.
-my $lists = join(",", map { $scriptdirs{$_}->{base} }
-			grep { $scriptdirs{$_}->{run} } @scripts);
-maint_log(LOG_WARNING, "about to run $lists");
+my @runscripts = grep { $scriptdirs{$_}->{run} } @scripts;
 
-#	maint_lognewline();
-foreach my $k ( @scripts )
+# Generate list of scripts that will be run and announce.
+my $lists = join(",", map { $scriptdirs{$_}->{base} } @runscripts );
+maint_log(LOG_WARNING, "about to run $lists");
+maint_lognewline();
+
+foreach my $k ( @runscripts )
 {
-	if ($scriptdirs{$k}->{run})
-	{
-		runscript($scriptdirs{$k}->{dir}, @ARGV);
-	}
+	runmaintscript($scriptdirs{$k}->{dir}, @ARGV);
 }
 maint_closelog();
 exit;

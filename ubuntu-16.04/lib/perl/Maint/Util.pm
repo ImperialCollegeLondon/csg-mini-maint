@@ -35,6 +35,7 @@ our $VERSION = '0.01';
 our $dry_run = 0;
 our $forced_hostname = undef;
 
+our $rundir = undef;		# DCW: comes from ConfigInfo..
 
 our $lastlocktime = undef;
 
@@ -45,15 +46,15 @@ use Sys::Hostname;
 #use Sys::Hostname::Long;
 use Cwd;
 use File::Basename;
+use File::Path;
 use IPC::Run3;
+
 use Maint::Log qw(:all);
-#DCWuse Maint::Constants qw(:all);
-#DCWuse Maint::Arch qw(:all);
-use Scalar::Util 'reftype';
+use Maint::ConfigInfo qw(:all);
 
 =head1 NAME
 
-Maint::Util - utilities for scripts based on Maint
+Maint::Util - utilities for Maint scripts
 
 =head1 SYNOPSIS
 
@@ -78,38 +79,59 @@ Maint::Util - utilities for scripts based on Maint
 
 =head1 EXPORT
 
-None by default, :all will export:
-
-maint_hostname
-maint_hostname_long
-maint_dryrun
-maint_runcmd
-maint_scriptname
-maint_runwhen
-maint_checkrunon
-maint_lastlocktime
-maint_checktime
-maint_parsemods
-maint_ordermods
-maint_locatemods
-maint_mkscriptpath
-maint_mkarchpath
-maint_mkpath
-maint_readhash
-maint_hostlookup
+None by default, :all will export all the above.
 
 =head1 FUNCTIONS
 
 =cut
 
+
 # Odd functions that don't really fit anywhere
 
-=head2 B<maint_dryrun([boolean:set_dry_run_flag)>
+#
+# _init_config():
+#	Read the rundir information from the ConfigInfo module.  Store it in
+#	the module global variable $rundir.
+#
+sub _init_config ()
+{
+	unless( defined $rundir )
+	{
+		$rundir = maint_getconfig( "rundir" );
+		$rundir //= "/var/run/sysmaint";
+	}
+}
 
-Accessor/Mutator for package global dry_run flag. Takes optional boolean to set
-or disable dry run mode.
 
-Returns current dry run flag.
+#
+# my @run = _run_lookup( $scriptname, $type );
+#	Internal function to do all $type (runwhen or runon) checking,
+#	given a scriptname, look up - if $type is "runwhen", which modes
+#	to run that script in; or if $type is "runon", which hostclasses
+#	to run that script on.
+#
+sub _run_lookup ($$)
+{
+    my( $scriptname, $type ) = @_;
+    _init_config();
+
+    $scriptname =~ s/^\d+//;	# remove numeric prefix if given..
+
+    my $run_key = "$scriptname:$type";
+    my $run_raw = maint_getconfig( $run_key );
+
+    return () unless $run_raw;
+
+    my @run = split( /\s+/, $run_raw );
+    return @run;
+}
+
+
+=head2 B<maint_dryrun($set_dry_run_flag>
+=head2 B<OR my $dryrunflag = maint_dryrun()>
+
+Accessor for package global dry_run flag.
+Returns current dry run flag, or sets it.
 
 =cut
 
@@ -117,13 +139,14 @@ sub maint_dryrun
 {
     my $p_dry_run = shift;
     $dry_run = $p_dry_run if defined $p_dry_run;
-
     return $dry_run;
 }
 
-=head2 B<maint_lastlocktime([int:locktime])>
 
-Accessor/Mutator for package global lastlocktime value. 
+=head2 B<maint_lastlocktime( $locktime )>
+=head2 B<OR my $locktime = maint_lastlocktime()>
+
+Accessor for package global lastlocktime value. 
 Takes optional date as seconds since epoch to set global.
 
 Returns the last lock time of this script.
@@ -137,14 +160,15 @@ sub maint_lastlocktime
     return $lastlocktime;
 }
 
-=head2 B<maint_runcmd(arrayref:command [, bool:override_dry_run [, errlevel [, stdin [, stdout [, stderr ]]]]])>
+
+=head2 B<maint_runcmd( $cmd_arrayref [, $override_dry_run [, $errlevel [, $stdin [, $stdout [, $stderr ]]]]])>
 
 Replacement for maint_system(). Uses IPC:Run3.
 
 Runs the command, unless --dryrun is in force.
-On non-zero exit from the command, will log at the given error level, and thus
-possibly die.
-stdin, stdout, stderr supplied optionally in any of the forms supported by IPC::Run3::run3()
+On non-zero exit from the command, will log at the given error level,
+and thus possibly die.  stdin, stdout, stderr supplied optionally in
+any of the forms supported by IPC::Run3::run3()
 
 May be abbreviated to maint_runcmd(arrayref:command) to meet most common needs.
 
@@ -188,22 +212,22 @@ prevented the command from running.
 
 sub maint_runcmd ($;$$$$$)
 {
-    my ($cmd, $overridedryrun, $errlevel, $stdin, $stdout, $stderr) = @_;
+    my( $cmd, $overridedryrun, $errlevel, $stdin, $stdout, $stderr ) = @_;
     
-    maint_log(LOG_ERR, "cmd is not an array ref")
-    	unless (ref $cmd eq 'ARRAY');
+    maint_log(LOG_ERR, "cmd is not an array ref") unless ref $cmd eq 'ARRAY';
     my $cmdstring = join ' ', @$cmd;
-    # Explicit to be clear:
+
     $overridedryrun = 0 unless defined $overridedryrun;
-    # What we will treat errors as (from Maint::Log.pm,
-    # avail values are: LOG_ERR (die), LOG_WARN (warn and continue)
+
+    # What we will treat errors as.  Taken from Maint::Log.pm, the
+    # available values are: LOG_ERR (die), LOG_WARNING (warn and continue)
     # LOG_INFO (info and continue) LOG_DEBUG (debug and continue)
     # For compatability $errlevel=undef => LOG_ERR and $errlevel=1 => LOG_DEBUG
-    if (!defined $errlevel || $errlevel == 0)
+    if( !defined $errlevel || $errlevel == 0 )
     {
 	    $errlevel = LOG_ERR;
     }
-    elsif ($errlevel == 1)
+    elsif( $errlevel == 1 )
     {
 	    $errlevel = LOG_WARNING;
     }
@@ -213,7 +237,7 @@ sub maint_runcmd ($;$$$$$)
     $stdout = \undef unless defined $stdout;
     $stderr = \$localstderr unless defined $stderr;
     
-    if(!$overridedryrun && maint_dryrun())
+    if( !$overridedryrun && maint_dryrun() )
     {
 	maint_log(LOG_DEBUG, "Not running: $cmdstring");
 	return -1;
@@ -226,7 +250,8 @@ sub maint_runcmd ($;$$$$$)
 	my $ret = run3($cmd, $stdin, $stdout, $stderr);
 	$SIG{__DIE__} = $diehldr;
 	my $cmdexit = $? >> 8;
-	if (!$ret || $cmdexit != 0) {
+	if( !$ret || $cmdexit != 0 )
+	{
 		my $perr = $!;
 		maint_log($errlevel, "maint_runcmd() failed: $cmdstring: exit=$cmdexit, perror=[$perr], cmd stderr=$localstderr");
 	}
@@ -234,35 +259,37 @@ sub maint_runcmd ($;$$$$$)
     }
 }
 
-=head2 B<maint_hostname([string:override_hostname)>
+=head2 B<maint_hostname( $override_hostname )>
+=head2 B<OR my $hostname = maint_hostname()>
 
-Returns the short form hostname using Sys::Hostname. If optional parameter is
-given, this and future calls to maint_hostname will return this override value.
+If the optional parameter $override_hostname is given, then all future calls
+to maint_hostname() will return this override value.
 Useful for testing scripts emulating running on other hosts.
 
+Without the optional parameter, returns the short form hostname
+(usually using Sys::Hostname) unless a previous override_hostname has been set.
 =cut
 
 sub maint_hostname (;$)
 {
     my $p = shift;
     $forced_hostname = $p if defined $p;
-    if (defined $forced_hostname)
-    {
-        return $forced_hostname;
-    }
-    else
-    {
-	my $hostname = Sys::Hostname::hostname();
-	# [dwm] Strip off any domain-name component.  The current host_classes table
-	# contains short names, and it won't find data when given a FQDN.
-	$hostname =~ s/^([^\.]+)\..*/$1/;
-	return $hostname;
-    }
+    return $forced_hostname if defined $forced_hostname;
+
+    my $hostname = Sys::Hostname::hostname();
+    # Strip off any domain-name component.  Hostclasses data normally
+    # contains short names..
+    $hostname =~ s/^([^\.]+)\..*/$1/;
+    return $hostname;
 }
+
 
 =head2 B<maint_hostname_long()>
 
 Returns the long form hostname using Sys::Hostname::Long.
+Currently this IGNORES the overriden hostname that may have been
+set by maint_hostname().  Not at all sure what the right thing to
+do would even be in that case!
 
 =cut
 
@@ -277,7 +304,7 @@ sub maint_hostname_long
 }
 
 
-=head2 B<maint_scriptname()>
+=head2 B<my $name = maint_scriptname()>
 
 Will return a derived name for the current script.
 Note: should not be called from top-level maint script utility, as it won't 
@@ -288,202 +315,182 @@ work.
 sub maint_scriptname
 {
     my $progpath = Cwd::abs_path($0);
-    my ($name) = ($progpath =~ m#([^/]+/[^/]+)/[^/]+$#);
+    my( $name ) = ($progpath =~ m#([^/]+/[^/]+)/[^/]+$#);
 
     # There's a problem with this strategy.  If we were invoked as './maint'
     # from a numbered maint directory, rather than using an absolute path,
     # then the above heuristic breaks.
-    if( defined $name && $name ne '.' )
-    {
-	    return $name;
-    }
-    maint_log(LOG_ERR, "Unable to determine maint script name; abs_path for $0 is: $progpath.");
+    return $name if defined $name && $name ne '.';
+
+    maint_log(LOG_ERR, "Unable to determine maint script name; ".
+    	"abs_path for $0 is: $progpath.");
     return 'UNKNOWN'; # Failure case - shouldn't happen
 }
 
-# Internal for function below
-sub _runagain($)
+
+# my $runagain = _runagain( $scriptname, @runwhen );
+#	Return true if the given maint script should be run again according
+#	to cron-* runwhen entries (and last-run timestamp file in $rundir),
+#	false otherwise.
+sub _runagain ($@)
 {
-    # Returns true if the given maint script should be run again according
-    # to cron-* instructions (and last-run timestamp file in /var/run/sysmaint),
-    # false otherwise.
-    my $base = shift;
-    $base = Cwd::abs_path($base);
-    my $scriptname = basename($base);
+    my( $scriptname, @runwhen ) = @_;
     maint_log(LOG_DEBUG, "Checking cron status for script $scriptname");
-    my @crontimes = glob("$base/runwhen/cron-*");
-    unless (scalar(@crontimes) >= 1)
-    {
-	# If no cron-* files exist, return false.
-	return 0;
-    }
+
+    my @crontimes = grep { /^cron-/ } @runwhen;
+    return 0 unless @crontimes;
 
     # Create last-run directory if it doesn't exist.  
     # (Not unlikely if it's a tmpfs.)
-    system("mkdir -p /var/run/sysmaint") unless -d "/var/run/sysmaint";
+    File::Path::mkpath( [$rundir], 0, 0755 ) unless -d "$rundir";
 
     # Lookup last-run time
-    maint_log(LOG_DEBUG, "Checking for existence of /var/run/sysmaint/maint-$scriptname...");
-    if( -e "/var/run/sysmaint/maint-$scriptname" )
+    my $lastrunfile = "$rundir/maint-$scriptname";
+    maint_log(LOG_DEBUG, "Checking for existence of $lastrunfile...");
+    unless( -e "$lastrunfile" )
     {
-	my $time    = time;
-	my $lastrun = (stat("/var/run/sysmaint/maint-$scriptname"))[9];
-
-	# For each of our cron rules, check to see if any of them
-	# instruct a new script execution.  If one does, return 'true'
-	# immediately.
-CRON:	foreach my $cron (sort (@crontimes))
-	{
-		my $rule = basename($cron);
-		$rule =~ s/^cron-//;
-		if ($rule =~ /^(\d+)m$/)
-		{
-			# This rule specifies that we should run again after
-			# N-minutes have elapsed.
-			my $threshold = $lastrun + ($1 * 60);
-			return 1 if $time > $threshold;
-			next CRON;
-		}
-		elsif( $rule =~ /^(\d{2})(\d{2})hrs$/ )
-		{
-			# This rule specifies that we should run on or after
-			# a specific time of day.
-			my( $cron_hr, $cron_min ) = ($1, $2);
-			my( $now_hr, $now_min ) = (localtime($time))[2,1];
-
-			# Calculate the time-of-day of both the current time
-			# and the target time, in seconds-since-midnight.
-			my $now_daytime = ($now_hr * 60 + $now_min) * 60;
-			my $cron_daytime = ($cron_hr * 60 + $cron_min) * 60;
-
-			# Calculate the relative difference in seconds between
-			# these two times.  
-			my $dt = $cron_daytime - $now_daytime;
-
-			# If dt is > 0, we should instead be comparing against
-			# that specific time of day *yesterday*, not today.
-			$dt -= 86400 if $dt > 0;
-
-			# Finally, calculate the unix timestamp for the
-			# the script's requested runtime.
-			my $threshold = $time + $dt;
-
-			# If the last-run time is older than the execution
-			# time requested, it should be run again now.  
-			# Return true.
-			return 1 if $lastrun < $threshold;
-			next CRON;
-		}
-		# If we didn't understand the cron format, log that fact here
-		# and carry on.
-		maint_log(LOG_WARNING, "Did not understand $scriptname cron entry, '$cron'.  Skipping.");
-	}
-	
-	# Cron rules were specified, but none of them indicate a new run is
-	# required.  Return false.
-	return 0;
+        # If there's no last-run file, we need to run the script now.
+        maint_log(LOG_DEBUG, "No last-run file exists, returning cron=1");
+        return 1;
     }
-    # If there's no last-run file, we need to run the script now.
-    maint_log(LOG_DEBUG, "No last-run file exists, returning cron=1");
-    return 1;
+    my $time    = time;
+    my @x       = stat($lastrunfile);
+    my $lastrun = $x[9];
+
+    # For each of our cron rules, check to see if any of them
+    # requires that we run this script now.  If one does, return
+    # 'true' immediately.
+    foreach my $rule (sort @crontimes)
+    {
+    	$rule =~ s/^cron-//;
+    	if ($rule =~ /^(\d+)m$/)
+    	{
+    		# This rule specifies that we should run again after
+    		# N-minutes have elapsed.
+    		my $threshold = $lastrun + ($1 * 60);
+    		return 1 if $time > $threshold;
+    		next;
+    	}
+    	elsif( $rule =~ /^(\d{2})(\d{2})hrs$/ )
+    	{
+    		# This rule specifies that we should run on or after
+    		# a specific time of day.
+    		my( $cron_hr, $cron_min ) = ($1, $2);
+    		my( $now_hr, $now_min ) = (localtime($time))[2,1];
+    
+    		# Calculate the time-of-day of both the current time
+    		# and the target time, in seconds-since-midnight.
+    		my $now_daytime = ($now_hr * 60 + $now_min) * 60;
+    		my $cron_daytime = ($cron_hr * 60 + $cron_min) * 60;
+    
+    		# Calculate the relative difference in seconds between
+    		# these two times.  
+    		my $dt = $cron_daytime - $now_daytime;
+    
+    		# If dt is > 0, we should instead be comparing against
+    		# that specific time of day *yesterday*, not today.
+    		$dt -= 86400 if $dt > 0;
+    
+    		# Finally, calculate the unix timestamp for the
+    		# the script's requested runtime.
+    		my $threshold = $time + $dt;
+    
+    		# If the last-run time is older than the execution
+    		# time requested, it should be run again now.  
+    		# Return true.
+    		return 1 if $lastrun < $threshold;
+    		next;
+    	}
+    	# If we didn't understand the cron format, log that fact here
+    	# and carry on.
+    	maint_log(LOG_WARNING, "Skipping bad $scriptname cron entry '$rule'.");
+    }
+	
+    # Cron rules were specified, but none of them indicate a new run is
+    # required.  Return false.
+    return 0;
 }
     
 
-# Internal for function below
-sub _get_runlist
-{
-    my $base = shift;
-    maint_log(LOG_ERR, "Parameter 1 must be the directory of a maint script")
-    	unless defined $base && length $base;
-    maint_log(LOG_ERR, "Parameter $base must be a directory") unless -d $base;
-    my $rundir = "$base/runwhen";
-    maint_log(LOG_DEBUG, "Looking for run entries in $rundir");
-    unless (-d $rundir)
-    {
-        maint_log(LOG_WARNING, "Your script will not run without a populated 'runwhen' directory.");
-        return {};
-    }
-    my $results={};
-    $results->{manual} = 1;
-    $results->{boot} = -f "$rundir/boot" ? 1 : 0;
-    $results->{install} = -f "$rundir/install" ? 1 : 0;
-    $results->{cron} = _runagain($base);
-    maint_log(LOG_DEBUG, "Run in: cron: " . $results->{cron} . 
-	    			"; boot: " . $results->{boot} . 
-			       	"; install: " . $results->{install} .
-				"; manual: 1");	
-    return $results;
-}
 
-=head2 B<maint_runwhen(string:maintdir, string:modetime)>
+=head2 B<my $run = maint_runwhen( $scriptname, $modetime )>
 
-Returns true if the script based at maintdir (which may be relative to cwd)
-is set to run at modetime (boot, manual, install, cron-*).
+Returns true if the script $scriptname is set to run at $modetime
+(boot, manual, install, cron-*).
 
-If the mode is 'cron', then it will only return 'true' if, given the last-run
-information in /var/run/sysmaint/$base it determines the script should be run
-again.
+If the mode is 'cron', then it will only return 'true' if, as
+well as the $scriptname being set to "run in" (when) one or more cron-*
+modes, the script should run again - given the last-run information in
+$rundir/$base.
 
 =cut
 
 sub maint_runwhen
 {
-    my $base = shift;
-    my $mode = shift;
-    maint_log(LOG_ERR, "maint_runwhen() Parameter 2 must be a mode time")
-    	unless defined $mode && length $mode;
-    my $r = _get_runlist($base);
-    return $r->{$mode} // 0;
+    my( $scriptname, $mode ) = @_;
+
+    my @runwhen = _run_lookup( $scriptname, 'runwhen' );
+    unless( @runwhen )
+    {
+        maint_log(LOG_WARNING, "No '$scriptname:runwhen' configuration entry");
+        return {};
+    }
+    my $runwhen = join( ',', @runwhen );
+    maint_log(LOG_DEBUG, "Runwhen entries for $scriptname: $runwhen");
+
+    my %runwhen = map { $_ => 1 } @runwhen;
+    my %results;
+    $results{manual} = 1;
+    $results{boot} = $runwhen{boot} ? 1 : 0;
+    $results{install} = $runwhen{install} ? 1 : 0;
+    $results{cron} = _runagain( $scriptname, @runwhen );
+    maint_log(LOG_DEBUG, "Run in: cron: " . $results{cron} . 
+	    			"; boot: " . $results{boot} . 
+			       	"; install: " . $results{install} .
+				"; manual: 1");	
+    return $results{$mode} // 0;
 }
 
 # Internal for function below
 sub _get_runonlist
 {
-    my $base = shift;
-    maint_log(LOG_ERR, "Parameter 1 must be the directory of a maint script")
-    	unless defined $base;
-    maint_log(LOG_ERR, "Parameter $base must be a directory") unless -d $base;
-    my $runondir = maint_mkpath($base, 'runon');
-    maint_log(LOG_DEBUG, "Looking for runon entries in $runondir");
-    unless (-d $runondir)
-    {
-        maint_log(LOG_WARNING, "Your maint script $base needs at least a runon/ directory with at least one entry or it's got no chance!");
-        return {};
-    }
-    
-    unless( opendir (DIR, $runondir) )
-    {
-        maint_log(LOG_ERR, "Cannot open directory $runondir for reading");
-    }
-    my @e = readdir(DIR);
-    close (DIR);
-    my %r = map {$_ => 1} @e;
-    delete $r{'..'} if exists $r{'..'};
-    delete $r{'.'} if exists $r{'.'};
-    return \%r;
+    my $scriptname = shift;
+
 }
 
-=head2 B<maint_checkrunon(string:maintdir, arrayref:classlist)>
+=head2 B<my $run = maint_checkrunon( $scriptname, $classlist )>
 
-Returns true if the script based at maintdir (which may be relative to cwd)
-should run based on the classlist of the host.
+Returns true if the script $scriptname should run based on the
+classlist of the current host.
 
-This grabs the contents of the runon/ dir minus '..' and '.' and then using that
-as a list, sees if there is an intersection with the supplied classlist to which 
-our hostname belongs.
+This grabs the contents of the "$scriptname:runon" config entry,
+which lists one or more hostclasses on which this script should run,
+and sees if there is an intersection with the supplied host classlist
+and the runon classlist.
 
 =cut
 
 sub maint_checkrunon
 {
-    my $base = shift;
-    my $list = shift;
+    my( $scriptname, $list ) = @_;
+
     maint_log(LOG_ERR, "maint_checkrunon() Parameter 2 must be a class list reference") unless defined $list && 
-    	reftype ($list) eq 'ARRAY';
-    my $r = _get_runonlist($base);
+    	ref( $list ) eq 'ARRAY';
+
+    my @runon = _run_lookup( $scriptname, 'runon' );
+    unless( @runon )
+    {
+        maint_log(LOG_WARNING, "No $scriptname:runon config key" );
+        return {};
+    }
+    my $run = join( ',', @runon );
+    maint_log(LOG_DEBUG, "Runon entries for $scriptname: $run");
+
+    my %runon = map { $_ => 1 } @runon;
+    
     foreach my $c (@$list)
     {
-        if( exists $r->{$c} )
+        if( $runon{$c} )
         {
             maint_log(LOG_DEBUG, "Matched runon class $c");
             return 1;
@@ -494,7 +501,7 @@ sub maint_checkrunon
 }
 
 
-=head2 B<maint_checktime(int:okstart, int:okend)>
+=head2 B<my $ok = maint_checktime( $okstart,  $okend )>
 
 Returns true if the current time is within okstart:00 .. okend:59. 
 Copes with ranges during the day and during the night - i.e. ones that 
@@ -512,17 +519,15 @@ sub maint_checktime ($$)
   {
     # time period is during day - does not span midnight
     return 0 if $hour < $okstarthour || $hour > $okendhour;
-
   } else
   {
     # time period is during night 
     return 0 if $hour < $okstarthour && $hour > $okendhour;
   }
-
   return 1;
 }
 
-=head2 B<maint_parsemods(string:modstring)>
+=head2 B<my $hashref = maint_parsemods( $modstring )>
 
 Parses a string for dotted suffix modifiers and returns a reference
 to a concrete structure containing the data collected from the
@@ -552,7 +557,8 @@ sub maint_parsemods ($)
   return \%data;
 }
 
-=head2 B<maint_ordermods(array:modstrings)>
+
+=head2 B<my @result = maint_ordermods( @modstrings )>
 
 Orders the modified strings given in modstrings into strict
 precedence order FOR THIS HOST (i.e., arch-specific at this time. 
@@ -593,7 +599,8 @@ sub maint_ordermods (@)
   return @orderedmod;
 }
 
-=head2 B<maint_locatemods(arrayref:modstrings, subref:filter)>
+
+=head2 B<my @altered = maint_locatemods( $modstrings, $filter )>
 
 Return a list of modified strings selected from those provided in
 modstrings which match the filter function provides. The filter function
@@ -607,10 +614,11 @@ sub maint_locatemods ($&;)
   my( $modstrings, $filter ) = @_;
   return grep {
     local $_ = maint_parsemods($_);
-    &$filter;
+    $filter->();
     # e.g. &$filter = sub {exists($_->{'comb'}) && ($_->{'comb'} eq 'stop')} 
   } @$modstrings;
 }
+
 
 ### Base path helpers
 
