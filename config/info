@@ -8,5 +8,7 @@
 	"lockdir":		"/tmp/minimaint.lock",
 	"rundir":		"/tmp/minimaint.run",
 	"hello:runwhen":	"boot,cron-60m",
-	"hello:runon":		"ALLHOSTS"
+	"hello:runon":		"ALLHOSTS",
+	"goodbye:runwhen":	"cron-15m",
+	"goodbye:runon":	"CLIENT"
 }
