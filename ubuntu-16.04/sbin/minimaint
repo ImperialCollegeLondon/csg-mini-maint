@@ -235,6 +235,7 @@ sub runmaintscript
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
+	maint_warning( "$perlbin -I $perllibpath $scriptpath @args" );
 	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptpath, @args],
 		undef, $nocrashonerr, undef, \*STDOUT, \*STDERR);
 	return 1;

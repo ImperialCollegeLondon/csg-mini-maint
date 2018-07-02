@@ -8,6 +8,10 @@ our %EXPORT_TAGS = (
 		qw(
 		  maint_initlog
 		  maint_log
+		  maint_debug
+		  maint_info
+		  maint_warning  
+		  maint_fatalerror
 		  maint_loglevel
 		  maint_logperline
 		  maint_isexitforced
@@ -37,6 +41,10 @@ Maint::Log - provide logging for scripts based on Maint
 
     use Maint::Log qw(:all);
     maint_initlog
+    maint_debug
+    maint_info
+    maint_warning  
+    maint_fatalerror
     maint_log
     maint_loglevel
     maint_logperline
@@ -88,22 +96,22 @@ use constant {
 	LOG_DEBUG      => Unix::Syslog::LOG_DEBUG,      # Very verbose (log everything)
 };
 our %logstr = (
-	LOG_ERR      => 'ERROR',
-	LOG_WARNING  => 'WARNING',
-	LOG_INFO     => 'INFO',
-	LOG_DEBUG    => 'DEBUG',
+	(LOG_ERR)      => 'ERROR',
+	(LOG_WARNING)  => 'WARNING',
+	(LOG_INFO)     => 'INFO',
+	(LOG_DEBUG)    => 'DEBUG',
 );
 our %logcolours = (
-	LOG_ERR      => "\x1b[0;1;37;41m",
-	LOG_WARNING  => "\x1b[0;1;40;33m",
-	LOG_INFO     => "\x1b[0;1;32m",
-	LOG_DEBUG    => "\x1b[0;1;34m",
+	(LOG_ERR)      => "\x1b[0;1;37;41m",
+	(LOG_WARNING)  => "\x1b[0;1;40;33m",
+	(LOG_INFO)     => "\x1b[0;1;32m",
+	(LOG_DEBUG)    => "\x1b[0;1;34m",
 );
 our %loglevels = (
-	LOG_ERR      => 'err',
-	LOG_WARNING  => 'warning', 
-	LOG_INFO     => 'notice',
-	LOG_DEBUG    => 'debug',
+	(LOG_ERR)      => 'err',
+	(LOG_WARNING)  => 'warning', 
+	(LOG_INFO)     => 'notice',
+	(LOG_DEBUG)    => 'debug',
 );
 our $loglevel        = LOG_INFO;
 our $lsyslogok       = 1;
@@ -435,7 +443,7 @@ sub maint_fatalerror ($)
 sub _formatforscreen
 {
 	my ($level, $msg) = @_;
-	return $msg unless exists $logstr{$level} && exists $logstr{$level};
+	return $msg unless exists $logstr{$level};
 	my $result      = '';
 	my $prefix      = '';
 	my $suffix      = '';
