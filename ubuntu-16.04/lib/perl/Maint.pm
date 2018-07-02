@@ -40,6 +40,9 @@ sub import
 }
 
 use File::Basename;
+use File::Slurp;
+use JSON;
+
 use Maint::Log qw(:all);
 use Maint::Lock qw(:all);
 use Maint::Util qw(:all);
