@@ -20,7 +20,6 @@ our %EXPORT_TAGS = (
 	    maint_ordermods
 	    maint_locatemods
 	    maint_mkarchpath
-	    maint_mkscriptpath
 	    maint_mkpath
 	    maint_readhash
 	    maint_hostlookup
@@ -71,7 +70,6 @@ Maint::Util - utilities for Maint scripts
 	maint_ordermods
 	maint_locatemods
 	maint_mkarchpath
-	maint_mkscriptpath
 	maint_mkpath
 	maint_readhash
 	maint_hostlookup
@@ -627,26 +625,10 @@ sub maint_mkarchpath ($$)
 {
 	my ($arch, $tail) = @_;
 
-	my $maintroot = maint_getconfig( "cachedir" );
+	my $maintroot = maint_getconfig( "maintroot" );
 	my $cattail = File::Spec->catfile(@$tail);
 	return File::Spec->catfile( $maintroot, $cattail);
 }
-
-=head2 B<my $path = maint_mkscriptpath( $arch, $tail)>
-
-Builds a path rooted at the directory where the caller script is
-running from
-
-=cut
-
-sub maint_mkscriptpath ($)
-{
-	my ($tail) = @_;
-	
-  	my $cattail = File::Spec->catfile(@$tail);
-	return File::Spec->catfile(maint_getscriptpath(), $cattail);
-}
-
 
 =head2 B<my $path = maint_mkpath(array:pathelems)>
 

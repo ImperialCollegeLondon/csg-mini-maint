@@ -93,7 +93,6 @@ our %config;			# the config hash
 our $lsbid;			# which distro (eg Ubuntu)
 our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
-our $maintroot;			# the cachedir..
 
 
 #
@@ -115,7 +114,8 @@ sub loadconfig()
 	$lsbrelease = $config{lsbrelease} ||
 		die "minimaint: no config lsbrelease\n";
 	$distribution = lc("$lsbid-$lsbrelease");
-	$maintroot = $config{cachedir} || die "maint: no config cachedir\n";
+	my $maintroot = "$config{cachedir}/$distribution";
+	$config{maintroot} = $maintroot;
 }
 
 
