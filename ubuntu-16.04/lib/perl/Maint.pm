@@ -106,7 +106,7 @@ sub loadconfig()
 	my $file = "$configdir/info";
 	my $text = read_file( $file ) ||
 		die "minimaint: can't slurp config file $file\n";
-	my $configdata = decode_json($text);
+	my $configdata = decode_json( $text );
 	#die Dumper $configdata;
 	%config = %$configdata;
 
@@ -183,11 +183,9 @@ sub maint_init
 	# Optional override of the hostname
 	maint_hostname( maint_getattr('hostname') )
 		if defined maint_getattr('hostname');
-	#my $wheretrigger = maint_testmode('install') ?
-	#	[ "share" ] : [ "lib", "perl" ];
-	my $wheretrigger = [ "share" ];
-	push @$wheretrigger, "safe_file_triggers.json";
-	maint_safetriggerfile( maint_mkarchpath( 'noarch', $wheretrigger ) );
+	maint_safetriggerfile(
+		maint_mkarchpath(
+			"noarch", ["share", "safe_file_triggers.json"] ) );
 	if( maint_getattr('dryrun') )
 	{
 		maint_log(LOG_INFO, "This script is in dry run mode. ".
@@ -197,15 +195,14 @@ sub maint_init
 
 	# Write out last-run timestamp.
 	# Create timestamp directory if it doesn't already exist.
-	my $timestampdir = "/var/run/sysmaint";
-	unless( -d $timestampdir )
-	{
-		mkdir $timestampdir, 0755;
-	}
+	#my $timestampdir = "/var/run/sysmaint";
+	my $timestampdir = maint_getconfig( "rundir" );
+	mkdir $timestampdir, 0755 unless -d $timestampdir;
 	$scriptname =~ s/\//-/;
 	open( my $outfh, '>', "$timestampdir/$scriptname" );
 	close( $outfh );
 }
+
 
 =head2 B<maint_exit(optional skiptriggers)>
 
