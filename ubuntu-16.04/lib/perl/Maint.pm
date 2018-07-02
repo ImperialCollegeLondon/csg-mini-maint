@@ -48,7 +48,6 @@ use Maint::ConfigInfo qw(:all);
 use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
 #use Maint::Config qw(:all);
-#use Maint::DB qw(:all);
 
 INIT
 {
@@ -86,6 +85,35 @@ group from each included module.
 
 =cut
 
+our $configdir;			# where the config lives
+our %config;			# the config hash
+our $lsbid;			# which distro (eg Ubuntu)
+our $lsbrelease;		# which release of Ubuntu (eg 16.04)
+our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
+
+
+#
+# loadconfig();
+#	load the compulsory configuration file..
+#
+sub loadconfig()
+{
+	$configdir = "/etc/minimaint";
+	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
+	my $file = "$configdir/info";
+	my $text = read_file( $file ) ||
+		die "minimaint: can't slurp config file $file\n";
+	my $configdata = decode_json($text);
+	#die Dumper $configdata;
+	%config = %$configdata;
+
+	$lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
+	$lsbrelease = $config{lsbrelease} ||
+		die "minimaint: no config lsbrelease\n";
+	$distribution = lc("$lsbid-$lsbrelease");
+}
+
+
 =head2 B<maint_init()>
 
 Must be called exactly once at the beginning of any script using Maint.
@@ -94,6 +122,12 @@ Must be called exactly once at the beginning of any script using Maint.
 
 sub maint_init
 {
+	# load the config..
+	loadconfig();
+
+	# copy $configdir and %config into maint's inner depths..
+	maint_setconfig( $configdir, \%config );
+
 	our $correctly_exited = 0;
 	my $scriptname = maint_scriptname();    # Get our computed script name
 	maint_initarg();                        # Deal with @ARGV

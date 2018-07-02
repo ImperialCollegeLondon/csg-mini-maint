@@ -50,7 +50,7 @@ use Cwd qw(abs_path);
 use Data::Dumper;
 use Getopt::Long qw(:config gnu_getopt pass_through);
 
-# --- Constants -------------------------------------------------------------
+# --- Global variables ------------------------------------------------------
 
 our %config;			# our configuration info
 
@@ -62,15 +62,12 @@ our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $cachedir;			# where to store local src eg /var/cache/minimaint
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
-my $git = "/usr/bin/git";
-
-
-# --- Global variables ------------------------------------------------------
+#my $git = "/usr/bin/git";
 
 # Computed later
-our $perllibpath;
-our $maintroot;
 our $configdir;
+our $maintroot;
+our $perllibpath;
 
 our $perlbin = "/usr/bin/perl";
 our $scriptsubdir = 'maintscripts';
@@ -197,7 +194,7 @@ sub bootstrap()
 	print "Syncing local cache...\n";
 	$maintroot = loadcache( $gitrepo, $cachedir );
 
-	$perllibpath = "$maintroot/lib/perl";
+	$perllibpath = "$maintroot/$distribution/lib/perl";
 #
 	unshift(@INC, $perllibpath); # Cannot use "use lib" directly
 	unshift(@INC, "/vol/csg/public/users/dcw/git-projects/csg-mini-maint/ubuntu-16.04/lib/perl" );	# DCW.. temp, gross, hack
@@ -210,13 +207,13 @@ sub bootstrap()
 # OS, then run the bootstrap sequence *right now* so that we can.
 
 BEGIN {
-loadconfig();
-check_os_version();
-bootstrap();
+	loadconfig();
+	check_os_version();
+	bootstrap();
 }
 
-# copy $configdir and %config into maint's inner depths..
-maint_setconfig( $configdir, \%config );
+# From now on, we CAN use Maint functions..
+
 
 #
 # runmaintscript( $scriptdir, @args );
@@ -303,7 +300,10 @@ sub findscripts()
 # --- Main program ----------------------------------------------------------
 
 
-my %scriptdirs = ();      # Global for passing set of scripts around
+# copy $configdir and %config into maint's inner depths..
+maint_setconfig( $configdir, \%config );
+
+my %scriptdirs = ();         # Global for passing set of scripts around
 my @origargv  = @ARGV;
 my @classlist = ();
 
@@ -333,8 +333,6 @@ my @scriptinfo = findscripts();
 # list mode: display the names of all maint scripts
 if( maint_getattr( "list" ) == 1 )
 {
-	#maint_log( LOG_WARNING, "DCW: list mode" );
-
 	# Scan all scripts
 	foreach my $sc (@scriptinfo)
 	{
