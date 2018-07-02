@@ -44,7 +44,7 @@ use strict;
 use warnings;
 use File::Basename;
 use File::Slurp;
-#use File::Path;
+use File::Path;
 use JSON;
 use Cwd qw(abs_path);
 use Data::Dumper;
@@ -123,11 +123,11 @@ sub fullclone ($$$)
 
 
 #
-# my $basedir = loadcache( $giturl, $repodest );
+# loadcache( $giturl, $repodest );
 #	Synchronize our local cache from upstream via git,
 #	given $giturl, the remote url to grab, and
 #	$repodest, the path to store our local cache,
-#	e.g. /var/cache/minimaint/.  Return the base dir of the local repo.
+#	e.g. /var/cache/minimaint/.
 #
 sub loadcache ($$)
 {
@@ -153,8 +153,6 @@ sub loadcache ($$)
 	chdir($repodest);
 	system("$git pull --quiet --ff-only") == 0
 		|| fullclone( $git, $giturl, $repodest );
-
-	return $repodest;
 }
 
 
@@ -192,7 +190,8 @@ sub bootstrap()
 	mkpath( [$cachedir], 0, 0755) unless -d $cachedir;
 
 	print "Syncing local cache...\n";
-	$maintroot = loadcache( $gitrepo, $cachedir );
+	loadcache( $gitrepo, $cachedir );
+	$maintroot = $cachedir;
 
 	$perllibpath = "$maintroot/$distribution/lib/perl";
 #

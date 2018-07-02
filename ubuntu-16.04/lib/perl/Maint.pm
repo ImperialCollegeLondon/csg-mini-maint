@@ -93,6 +93,7 @@ our %config;			# the config hash
 our $lsbid;			# which distro (eg Ubuntu)
 our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
+our $maintroot;			# the cachedir..
 
 
 #
@@ -114,6 +115,7 @@ sub loadconfig()
 	$lsbrelease = $config{lsbrelease} ||
 		die "minimaint: no config lsbrelease\n";
 	$distribution = lc("$lsbid-$lsbrelease");
+	$maintroot = $config{cachedir} || die "maint: no config cachedir\n";
 }
 
 
@@ -152,6 +154,7 @@ sub maint_init
 	maint_log(LOG_DEBUG, "Acquired lock on this script");
 	my $scriptpath = Cwd::abs_path($0);
 	my $scriptdir  = dirname($scriptpath);
+	my $scriptname  = basename($scriptpath);
 	maint_log(LOG_WARNING, "Cannot get script base directory")
 		unless defined $scriptdir;
 	chdir($scriptdir) || maint_log(LOG_ERR, "Cannot chdir to [$scriptdir]");
@@ -159,7 +162,7 @@ sub maint_init
 
 	# Check if we're to skip based on modetime
 	my $mode = maint_getattr('mode');
-	unless( maint_runwhen('.', $mode) )
+	unless( maint_runwhen($scriptname, $mode) )
 	{
 		maint_log(LOG_DEBUG, "Skipping due to skipwhen constraint");
 		maint_exit(1);
@@ -167,7 +170,7 @@ sub maint_init
 	}
 	my @classlist = maint_listclasses();
 	maint_log(LOG_ERR, "Cannot get class list") unless scalar @classlist > 0;
-	unless( maint_checkrunon('.', \@classlist) )
+	unless( maint_checkrunon($scriptname, \@classlist) )
 	{
 		maint_log(LOG_DEBUG, "Skipping due to runon constraint");
 		maint_exit(1);

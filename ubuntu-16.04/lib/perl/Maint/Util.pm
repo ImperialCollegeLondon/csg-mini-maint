@@ -622,7 +622,7 @@ sub maint_locatemods ($&;)
 
 ### Base path helpers
 
-=head2 B<maint_mkarchpath(string:arch, list:tail)>
+=head2 B<my $path = maint_mkarchpath( $arch, $tail )>
 
 Builds an arch-specific path based on the various settings
 the two inputs provided.
@@ -633,11 +633,12 @@ sub maint_mkarchpath ($$)
 {
 	my ($arch, $tail) = @_;
 
+	my $maintroot = maint_getconfig( "cachedir" );
 	my $cattail = File::Spec->catfile(@$tail);
-	return File::Spec->catfile(maint_getmaintpath(), $cattail);
+	return File::Spec->catfile( $maintroot, $cattail);
 }
 
-=head2 B<maint_mkscriptpath(string:arch, list:tail)>
+=head2 B<my $path = maint_mkscriptpath( $arch, $tail)>
 
 Builds a path rooted at the directory where the caller script is
 running from
@@ -653,7 +654,7 @@ sub maint_mkscriptpath ($)
 }
 
 
-=head2 B<maint_mkpath(array:pathelems)>
+=head2 B<my $path = maint_mkpath(array:pathelems)>
 
 Builds a relative path. Essentially wraps File::Spec->catfile().
 
