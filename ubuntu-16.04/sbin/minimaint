@@ -224,18 +224,18 @@ sub runmaintscript
 	my( $scriptpath, @args ) = @_;
 	unless( -f $scriptpath )
 	{
-		maint_log(LOG_WARNING, "file $scriptpath doesn't exist");
+		maint_warning( "file $scriptpath doesn't exist");
 		return 0;
 	}
-	unless( -x $scriptpath )
-	{
-		maint_log(LOG_WARNING, "script file $scriptpath isn't executeable - skipping");
-		return 0;
-	}
+	#unless( -x $scriptpath )
+	#{
+	#	maint_warning( "script $scriptpath isn't executable - skipping");
+	#	return 0;
+	#}
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
-	maint_warning( "$perlbin -I $perllibpath $scriptpath @args" );
+	maint_debug( "Running: $perlbin -I $perllibpath $scriptpath @args" );
 	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptpath, @args],
 		undef, $nocrashonerr, undef, \*STDOUT, \*STDERR);
 	return 1;
@@ -253,29 +253,29 @@ sub findscripts()
 	my $scriptdir = "$maintroot/$distribution/$scriptsubdir";
 
 	# Scan the directory
-	maint_log(LOG_DEBUG, "Opening script directory $scriptdir");
+	maint_debug( "Opening script directory $scriptdir");
 	unless( opendir(DIR, $scriptdir) )
 	{
-		maint_log(LOG_ERR, "Cannot open directory $scriptdir for reading");
+		maint_fatalerror( "Can't open directory $scriptdir");
 	}
 	foreach my $f (readdir(DIR))
 	{
 		if( $f =~ m/^\./ ) # Ignore anything beginning with .
 		{
-			maint_log(LOG_DEBUG, "Ignoring $f");
+			maint_debug( "Ignoring $f");
 			next;
 		}
 		my $d = "$scriptdir/$f";
 		next unless -f $d;          # Ignore non files
-		maint_log(LOG_DEBUG, "Looking at file $d");
+		maint_debug( "Looking at file $d");
 		if( $f =~ m/^(\d+)([[:alpha:]\-_]+)$/ )
 		{
 			my $num  = 0 + $1;
 			my $base = $2;
-			maint_log(LOG_DEBUG, "Found maint file $d, number=$num, base=$base");
+			maint_debug( "Found maint file $d, number=$num, base=$base");
 			if( exists $seen{$base} )
 			{
-				maint_log(LOG_WARNING,
+				maint_warning(
 "You have more than one maint script with the same base name - conflicting script is called $f - skipping"
 				);
 				next;
@@ -286,7 +286,7 @@ sub findscripts()
 		}
 		else
 		{
-			maint_log(LOG_WARNING,
+			maint_warning(
 "Maint directory $d has invalid form, ignoring. To enable, make sure it matches \\d+[[:alpha:]]+"
 			);
 		}
@@ -320,7 +320,7 @@ our @scripts = @ARGV;
 @ARGV = ();
 maint_pushargs();
 
-maint_log( LOG_DEBUG, "scripts to run: ". join(' ',@scripts) ) if @scripts;
+maint_debug( "scripts to run: ". join(' ',@scripts) ) if @scripts;
 
 # Check if root.
 #DCWdie "minimaint: need to run as root\n" if $> != 0;
@@ -345,13 +345,13 @@ if( maint_getattr( "list" ) == 1 )
 }
 
 my $cd = maint_getconfigdir();
-my $ch = maint_getconfig( "hostclass:source" );
-my $cf = maint_getconfig( "hostclass:file" );
-maint_log( LOG_WARNING, "debug: configdir=$cd, hostclass:source=$ch, hostclass:file=$cf" );
+my $chs = maint_getconfig( "hostclass:source" );
+my $chf = maint_getconfig( "hostclass:file" );
+maint_debug( "Configdir=$cd, hostclass:source=$chs, hostclass:file=$chf" );
 
 # Reload cached class data
 maint_lockname($scriptlock);
-maint_log( LOG_ERR, 'Cannot get lock, aborting' ) unless maint_setlock();
+maint_fatalerror( 'Cannot get lock, aborting' ) unless maint_setlock();
 maint_reloadclasses(1);
 @classlist = maint_listclasses();
 maint_clearlock();
@@ -359,8 +359,7 @@ maint_clearlock();
 # Run desired scripts (if allowed)
 my %requestedscripts = map { $_ => 1 } @scripts;
 
-maint_log( LOG_WARNING, "debug: want to run scripts @scripts" );
-maint_lognewline();
+maint_debug( "Want to run scripts @scripts" );
 
 foreach my $sc (@scriptinfo)
 {
@@ -369,7 +368,7 @@ foreach my $sc (@scriptinfo)
 	my $scriptpath = $sc->{file};
 	my $scriptname = basename( $scriptpath );
 
-	maint_log(LOG_WARNING, "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
+	maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
 	$scriptdirs{$num} = { path => $scriptpath, file => $scriptname, base => $base, run => 0 };
 	if (@scripts == 0 || exists $requestedscripts{$base})
 	{
@@ -382,20 +381,20 @@ foreach my $sc (@scriptinfo)
 	my $mode = maint_getattr('mode');
 	unless( maint_runwhen($scriptname, $mode) )
 	{
-		maint_log(LOG_WARNING, "Skipping $scriptname due to runwhen/ constraint");
+		maint_warning( "Skipping $scriptname due to runwhen/ constraint");
 		maint_lognewline();
 		$scriptdirs{$num}->{run} = 0;
 	}
 	unless( maint_checkrunon($scriptname, \@classlist ))
 	{
-		maint_log(LOG_WARNING, "Skipping $scriptname due to runon/ constraint");
+		maint_warning( "Skipping $scriptname due to runon/ constraint");
 		maint_lognewline();
 		$scriptdirs{$num}->{run} = 0;
 	}
 }
 foreach my $t (sort keys %requestedscripts)
 {
-	maint_log(LOG_WARNING, "Ignoring non-existent script $t");
+	maint_warning( "Ignoring non-existent script $t");
 	maint_lognewline();
 }
 
@@ -407,8 +406,7 @@ my @runscripts = grep { $scriptdirs{$_}->{run} } @scripts;
 
 # Generate list of scripts that will be run and announce.
 my $lists = join(",", map { $scriptdirs{$_}->{base} } @runscripts );
-maint_log(LOG_WARNING, "about to run $lists");
-maint_lognewline();
+maint_debug( "About to run $lists");
 
 foreach my $k ( @runscripts )
 {
