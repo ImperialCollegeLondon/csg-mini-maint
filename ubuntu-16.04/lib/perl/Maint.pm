@@ -154,7 +154,6 @@ sub maint_init
 	maint_log(LOG_DEBUG, "Acquired lock on this script");
 	my $scriptpath = Cwd::abs_path($0);
 	my $scriptdir  = dirname($scriptpath);
-	my $scriptname  = basename($scriptpath);
 	maint_log(LOG_WARNING, "Cannot get script base directory")
 		unless defined $scriptdir;
 	chdir($scriptdir) || maint_log(LOG_ERR, "Cannot chdir to [$scriptdir]");

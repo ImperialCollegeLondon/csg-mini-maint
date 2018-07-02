@@ -215,22 +215,21 @@ BEGIN {
 
 
 #
-# runmaintscript( $scriptdir, @args );
+# runmaintscript( $scriptfile, @args );
 #	Run a specific named maint-script as identified by it's script
-#	directory, with the given args
+#	file, with the given args
 #
 sub runmaintscript
 {
-	my ($scriptdir, @args) = @_;
-	unless( -d $scriptdir )
+	my( $scriptfile, @args ) = @_;
+	unless( -f $scriptfile )
 	{
-		maint_log(LOG_WARNING, "directory $scriptdir doesn't exist");
+		maint_log(LOG_WARNING, "file $scriptfile doesn't exist");
 		return 0;
 	}
-	my $scriptfile = "$scriptdir/$maintscriptfile";
-	unless( -f $scriptfile && -x $scriptfile )
+	unless( -x $scriptfile )
 	{
-		maint_log(LOG_WARNING, "script file $scriptfile doesn't exist or isn't executeable - skipping");
+		maint_log(LOG_WARNING, "script file $scriptfile isn't executeable - skipping");
 		return 0;
 	}
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
@@ -266,13 +265,13 @@ sub findscripts()
 			next;
 		}
 		my $d = "$scriptdir/$f";
-		next unless -d $d;          # Ignore non directories
-		maint_log(LOG_DEBUG, "Looking at directory $d");
+		next unless -f $d;          # Ignore non files
+		maint_log(LOG_DEBUG, "Looking at file $d");
 		if( $f =~ m/^(\d+)([[:alpha:]\-_]+)$/ )
 		{
 			my $num  = 0 + $1;
 			my $base = $2;
-			maint_log(LOG_DEBUG, "Found maint dir $d, number=$num, base=$base");
+			maint_log(LOG_DEBUG, "Found maint file $d, number=$num, base=$base");
 			if( exists $seen{$base} )
 			{
 				maint_log(LOG_WARNING,
@@ -281,7 +280,7 @@ sub findscripts()
 				next;
 			}
 			push @results,
-				{ num => $num, dir => $d, base => $base };
+				{ num => $num, file => $d, base => $base };
 			$seen{$base}++;
 		}
 		else
@@ -366,10 +365,10 @@ foreach my $sc (@scriptinfo)
 {
 	my $num = $sc->{num};
 	my $base = $sc->{base};
-	my $d = $sc->{dir};
+	my $scriptname = $sc->{file};
 
-	maint_log(LOG_DEBUG, "Found maint dir $d, number=$num, base=$base");
-	$scriptdirs{$num} = { dir => $d, base => $base, run => 0 };
+	maint_log(LOG_DEBUG, "Found maint file $scriptname, number=$num, base=$base");
+	$scriptdirs{$num} = { file => $scriptname, base => $base, run => 0 };
 	if (@scripts == 0 || exists $requestedscripts{$base})
 	{
 		# We want to run this
@@ -378,7 +377,6 @@ foreach my $sc (@scriptinfo)
 	}
 
 	# should we exclude any scripts due to runwhen/runon constraints?
-	my $scriptname = basename($d);
 	my $mode = maint_getattr('mode');
 	unless( maint_runwhen($scriptname, $mode) )
 	{
@@ -412,7 +410,7 @@ maint_lognewline();
 
 foreach my $k ( @runscripts )
 {
-	runmaintscript($scriptdirs{$k}->{dir}, @ARGV);
+	runmaintscript($scriptdirs{$k}->{file}, @ARGV);
 }
 maint_closelog();
 exit;
