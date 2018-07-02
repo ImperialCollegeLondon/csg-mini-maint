@@ -1,18 +1,18 @@
 #!/usr/bin/perl
 
-# hello: do-nothing maint script to say hello:-)
+# goodbye: do-nothing maint script to say goodbye:-)
 
 =head1 NAME
 
-maint hello
+maint goodbye
 
 =head1 SYNOPSIS
 
-maint [standard-maint-args] hello
+maint [standard-maint-args] goodbye
 
 =head1 DESCRIPTION
 
-This is used to say hello, to test that maint is working.
+This is used to say goodbye, to test that maint is working.
 
 =head2 Options
 
@@ -30,7 +30,7 @@ maint_init();
 
 maint_usage() unless @ARGV == 0;
 
-maint_warning( "greetings from 001hello" );
+maint_warning( "goodbye from 999goodbye" );
 
 maint_exit();
 
