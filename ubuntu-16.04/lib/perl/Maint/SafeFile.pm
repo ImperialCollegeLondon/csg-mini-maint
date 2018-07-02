@@ -100,6 +100,7 @@ use Fcntl qw(:DEFAULT F_SETFD F_GETFD);
 use File::Temp qw(tempfile tempdir);
 use File::Compare;
 use File::Path;
+use File::Slurp;
 use JSON;
 use File::Basename;
 
