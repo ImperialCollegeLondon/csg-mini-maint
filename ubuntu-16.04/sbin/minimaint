@@ -215,27 +215,27 @@ BEGIN {
 
 
 #
-# runmaintscript( $scriptfile, @args );
+# runmaintscript( $scriptpath, @args );
 #	Run a specific named maint-script as identified by it's script
-#	file, with the given args
+#	path and name, with the given args
 #
 sub runmaintscript
 {
-	my( $scriptfile, @args ) = @_;
-	unless( -f $scriptfile )
+	my( $scriptpath, @args ) = @_;
+	unless( -f $scriptpath )
 	{
-		maint_log(LOG_WARNING, "file $scriptfile doesn't exist");
+		maint_log(LOG_WARNING, "file $scriptpath doesn't exist");
 		return 0;
 	}
-	unless( -x $scriptfile )
+	unless( -x $scriptpath )
 	{
-		maint_log(LOG_WARNING, "script file $scriptfile isn't executeable - skipping");
+		maint_log(LOG_WARNING, "script file $scriptpath isn't executeable - skipping");
 		return 0;
 	}
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
-	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptfile, @args],
+	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptpath, @args],
 		undef, $nocrashonerr, undef, \*STDOUT, \*STDERR);
 	return 1;
 }
@@ -365,10 +365,11 @@ foreach my $sc (@scriptinfo)
 {
 	my $num = $sc->{num};
 	my $base = $sc->{base};
-	my $scriptname = $sc->{file};
+	my $scriptpath = $sc->{file};
+	my $scriptname = basename( $scriptpath );
 
-	maint_log(LOG_DEBUG, "Found maint file $scriptname, number=$num, base=$base");
-	$scriptdirs{$num} = { file => $scriptname, base => $base, run => 0 };
+	maint_log(LOG_WARNING, "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
+	$scriptdirs{$num} = { path => $scriptpath, file => $scriptname, base => $base, run => 0 };
 	if (@scripts == 0 || exists $requestedscripts{$base})
 	{
 		# We want to run this
@@ -410,7 +411,7 @@ maint_lognewline();
 
 foreach my $k ( @runscripts )
 {
-	runmaintscript($scriptdirs{$k}->{file}, @ARGV);
+	runmaintscript($scriptdirs{$k}->{path}, @ARGV);
 }
 maint_closelog();
 exit;

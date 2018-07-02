@@ -183,8 +183,9 @@ sub maint_init
 	# Optional override of the hostname
 	maint_hostname( maint_getattr('hostname') )
 		if defined maint_getattr('hostname');
-	my $wheretrigger = maint_testmode('install') ?
-		[ "share" ] : [ "lib", "perl" ];
+	#my $wheretrigger = maint_testmode('install') ?
+	#	[ "share" ] : [ "lib", "perl" ];
+	my $wheretrigger = [ "share" ];
 	push @$wheretrigger, "safe_file_triggers.json";
 	maint_safetriggerfile( maint_mkarchpath( 'noarch', $wheretrigger ) );
 	if( maint_getattr('dryrun') )
