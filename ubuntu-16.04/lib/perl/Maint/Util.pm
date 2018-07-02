@@ -315,20 +315,10 @@ work.
 sub maint_scriptname
 {
     my $progpath = Cwd::abs_path($0);
-    #my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
-    my $name = basename( $progpath );
+    my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
+    #my $name = basename( $progpath );
     $name =~ s/^\d+//;
-
-    print "debug: maint_scriptname: name=$name\n";
-
-    # There's a problem with this strategy.  If we were invoked as './maint'
-    # from a numbered maint directory, rather than using an absolute path,
-    # then the above heuristic breaks.
-    return $name if defined $name && $name ne '.';
-
-    maint_log(LOG_ERR, "Unable to determine maint script name; ".
-    	"abs_path for $0 is: $progpath.");
-    return 'UNKNOWN'; # Failure case - shouldn't happen
+    return $name;
 }
 
 

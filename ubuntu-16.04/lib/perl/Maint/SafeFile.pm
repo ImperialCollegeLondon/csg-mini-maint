@@ -100,7 +100,7 @@ use Fcntl qw(:DEFAULT F_SETFD F_GETFD);
 use File::Temp qw(tempfile tempdir);
 use File::Compare;
 use File::Path;
-use XML::Simple;
+use JSON;
 use File::Basename;
 
 =head2 B<maint_safedryrun([bool:dry_run_flag])>
@@ -181,7 +181,8 @@ sub maint_checkdiskspace($)
 }
 
 
-=head2 B<maint_safetriggerfile([string:maint_safetriggerfile])>
+=head2 B<maint_safetriggerfile( $maint_safetriggerfile )>
+=head2 B<my $triggerfile = maint_safetriggerfile()>
 
 Returns (and optionally sets) the current maint_safetriggerfile.
 
@@ -890,47 +891,43 @@ Suggest rewriting this function, and replacing the XML file, so it's simpler..
 
 sub maint_saferuntriggers
 {
-	$XML::Simple::PREFERRED_PARSER = "XML::Parser";
-	unless( defined $maint_safetriggerfile && length $maint_safetriggerfile && -f $maint_safetriggerfile )
+	unless( defined $maint_safetriggerfile && $maint_safetriggerfile && -f $maint_safetriggerfile )
 	{
 		maint_log(LOG_DEBUG, "No triggers file specified");
 		return 0;
 	}
-	my $xmldat;
-	my $xmlp = new XML::Simple(rootname => "triggers", xmldecl => 1, forcearray => 1);
+	my $triggerdata = read_file( $maint_safetriggerfile );
+	my $json = decode_json( $triggerdata );
+
 	my %files_renamed = map { $_ => 1 } @files_renamed_list;
 	maint_log(LOG_INFO, "Checking file triggers");
-	$xmldat = eval { $xmlp->XMLin($maint_safetriggerfile) };
-	if( $@ )
-	{
-		maint_log(LOG_WARNING, "Error reading triggers file: $maint_safetriggerfile - $@");
-		return 0;
-	}
-	my $triggerlist = $xmldat->{trigger};
 	my @actions     = ();
-	foreach my $set (@$triggerlist)
+	foreach my $pair (@$json)
 	{
-		foreach my $testforfile (@{ $set->{file} })
+		my $testforfile = $pair->{file};
+		my $action = $pair->{action};
+		if( exists $files_renamed{$testforfile} )
 		{
-			if( exists $files_renamed{$testforfile} )
-			{
-				maint_log(LOG_DEBUG, "Noted trigger on file $testforfile");
-				push @actions, @{ $set->{action} };
-			}
+			maint_log(LOG_DEBUG, "Noted trigger on file $testforfile");
+			push @actions, $action;
 		}
 	}
+	my %actionsdone;
 	foreach my $act (@actions)
 	{
+		next if $actionsdone{$act}++;
 		if( maint_safedryrun() )
 		{
 			maint_log(LOG_INFO, "dry_run set: would have run trigger: $act");
 			next;
 		}
-		maint_log(LOG_DEBUG, "Running trigger: $act");
-		maint_runcmd([split(/\s+/, $act)], undef, 1); # We only have a string...
+		maint_log(LOG_WARNING, "Would run trigger: $act");
+		#maint_log(LOG_DEBUG, "Running trigger: $act");
+		#DCWmaint_runcmd([split(/\s+/, $act)], undef, 1); # We only have a string...
 	}
 	return 1;
 }
+
 
 =head2 B<maint_safeprint( $filehandle, $text)>
 

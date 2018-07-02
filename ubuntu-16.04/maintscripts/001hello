@@ -30,7 +30,7 @@ maint_init();
 
 maint_usage() unless @ARGV == 0;
 
-maint_log(LOG_WARNING, "hello" );
+maint_log(LOG_WARNING, "greetings from 001hello" );
 
 maint_exit();
 

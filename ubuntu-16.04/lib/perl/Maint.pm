@@ -185,7 +185,7 @@ sub maint_init
 		if defined maint_getattr('hostname');
 	my $wheretrigger = maint_testmode('install') ?
 		[ "share" ] : [ "lib", "perl" ];
-	push @$wheretrigger, "safe_file_triggers.xml";
+	push @$wheretrigger, "safe_file_triggers.json";
 	maint_safetriggerfile( maint_mkarchpath( 'noarch', $wheretrigger ) );
 	if( maint_getattr('dryrun') )
 	{
