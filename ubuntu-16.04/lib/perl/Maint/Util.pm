@@ -315,7 +315,9 @@ work.
 sub maint_scriptname
 {
     my $progpath = Cwd::abs_path($0);
-    my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
+    #my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
+    my $name = basename( $progpath );
+    $name =~ s/^\d+//;
 
     print "debug: maint_scriptname: name=$name\n";
 
