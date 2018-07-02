@@ -72,7 +72,7 @@ our $perllibpath;
 our $maintroot;
 
 our $perlbin = "/usr/bin/perl";
-our $scriptsubdir = 'maint';
+our $scriptsubdir = 'maintscripts';
 our $maintscriptfile = 'maint';
 our $scriptlock = 'maint-driver';
 
@@ -134,14 +134,7 @@ sub loadcache ($$)
 {
 	my( $giturl, $repodest ) = @_;
 
-	# Sync our local git repository clone (blowing away what we've
-	# already got if it turns out that something funny has
-	# happened to upstream and we can't update simply.)
-
-	unless ( -d $repodest )
-	{
-		mkpath([$repodest], 0, 0755);
-	}
+	mkpath([$repodest], 0, 0755) unless -d $repodest;
 
 	-d $repodest || die "Cannot create directory $repodest\n";
 	-w $repodest || die "directory $repodest not writable!\n";
@@ -203,7 +196,7 @@ sub bootstrap()
 	}
 
 	print "Syncing local cache...\n";
-	my $maintroot = loadcache( $gitrepo, $cachedir );
+	$maintroot = loadcache( $gitrepo, $cachedir );
 
 	$perllibpath = File::Spec->catdir( $maintroot, 'lib', 'perl' );
 #
@@ -320,7 +313,7 @@ maint_initarg();             # @ARGV contains remaining args only
 maint_setlogging();
 
 # process command line args
-maint_usage() unless @ARGV;
+maint_usage() unless maint_getattr("list") || @ARGV;
 our @scripts = @ARGV;
 
 # Put back script args
@@ -330,16 +323,9 @@ maint_pushargs();
 maint_log( LOG_DEBUG, "scripts to run: ". join(' ',@scripts) ) if @scripts;
 
 # Check if root.
-die "minimaint: need to run as root\n" if $> != 0;
+#DCWdie "minimaint: need to run as root\n" if $> != 0;
 
 maint_initlog("maint system in $cachedir (production mode)");
-
-# Reload cached class data
-maint_lockname($scriptlock);
-maint_log( LOG_ERR, 'Cannot get lock, aborting' ) unless maint_setlock();
-maint_reloadclasses(1);
-@classlist = maint_listclasses();
-maint_clearlock();
 
 my @scriptinfo = findscripts();
 
@@ -358,6 +344,13 @@ if( maint_getattr( "list" ) == 1 )
 	maint_closelog();
 	exit(0);
 }
+
+# Reload cached class data
+maint_lockname($scriptlock);
+maint_log( LOG_ERR, 'Cannot get lock, aborting' ) unless maint_setlock();
+maint_reloadclasses(1);
+@classlist = maint_listclasses();
+maint_clearlock();
 
 # Otherwise, run desired scripts (if allowed)
 my %requestedscripts = map { $_ => 1 } @scripts;

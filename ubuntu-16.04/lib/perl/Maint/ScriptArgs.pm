@@ -108,7 +108,7 @@ sub maint_initarg ()
 		mode        => 'manual',
 		help        => 0,
 	);
-	unless (
+	maint_usage() unless
 		GetOptions(
 			\%args,
 			'debug!',
@@ -122,14 +122,10 @@ sub maint_initarg ()
 			'mode:s',
 			'hostname:s',
 			'help|usage',
-		)
-	  )
-	{
-		maint_usage();    # and exit
-	}
+		);
 	maint_usage() if $args{help};
-	$args{dryrun} = 1
-	  if $args{hostname};    # Force dryrun if we are faking the hostname
+	# Force dryrun if we are faking the hostname
+	$args{dryrun} = 1 if $args{hostname};
 	return 1;
 }
 

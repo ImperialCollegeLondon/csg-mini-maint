@@ -1,0 +1,52 @@
+#!/usr/bin/perl
+
+# hello: do-nothing maint script to say hello:-)
+
+=head1 NAME
+
+maint hello
+
+=head1 SYNOPSIS
+
+maint [standard-maint-args] hello
+
+=head1 DESCRIPTION
+
+This is used to say hello, to test that maint is working.
+
+=head2 Options
+
+Standard maint args, no others.
+
+=cut
+
+use strict;
+use warnings;
+
+use Maint qw(:all);
+use Data::Dumper;
+
+maint_init();
+
+maint_usage() unless @ARGV == 0;
+
+maint_log(LOG_WARNING, "hello" );
+
+maint_exit();
+
+
+=head1 AUTHORS
+
+Duncan White E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson E<lt>mwj@doc.ic.ac.ukE<gt>,
+David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
+Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
+Tim Southerwood, E<lt>ts@dionic.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003-2018 Department of Computing, Imperial College London
+
+=cut
+
