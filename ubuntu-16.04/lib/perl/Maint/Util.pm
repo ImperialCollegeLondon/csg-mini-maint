@@ -315,7 +315,9 @@ work.
 sub maint_scriptname
 {
     my $progpath = Cwd::abs_path($0);
-    my( $name ) = ($progpath =~ m#([^/]+/[^/]+)$#);
+    my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
+
+    print "debug: maint_scriptname: name=$name\n";
 
     # There's a problem with this strategy.  If we were invoked as './maint'
     # from a numbered maint directory, rather than using an absolute path,
