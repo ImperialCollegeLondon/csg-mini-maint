@@ -95,7 +95,7 @@ foreach my $srcdir (@distfiles)
 	$srcfilename = "/$srcfilename";
 
 	my $destdir = dirname( $srcfilename );
-	my $destfile = "$destroot$srcfilename";
+	my $destfile = "$destroot$destdir";
 
 	maint_info( "debug: chosen file $srcfilename, props=$showprops" );
 
