@@ -12,5 +12,7 @@
 	"hello:runwhen":	"boot,cron-60m",
 	"hello:runon":		"ALLHOSTS",
 	"goodbye:runwhen":	"cron-15m",
-	"goodbye:runon":	"CLIENT"
+	"goodbye:runon":	"CLIENT",
+	"dist:runwhen":		"boot,cron-15m",
+	"dist:runon":		"ALLHOSTS"
 }

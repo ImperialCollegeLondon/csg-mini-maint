@@ -69,7 +69,7 @@ maint_usage() unless @ARGV == 0;
 
 my $confdir = maint_getconfigdir();
 my $distbase = "$confdir/dist";
-maint_fatalerror( "No dist base $distbase!" ) unless -f $distbase;
+maint_fatalerror( "No dist base $distbase!" ) unless -d $distbase;
 my $destroot = maint_getconfig( "dist:root" ) // "/";
 mkpath( [$destroot], 0, 0755 ) unless -d $destroot;
 maint_fatalerror( "No dist destination root!" ) unless -d $destroot;

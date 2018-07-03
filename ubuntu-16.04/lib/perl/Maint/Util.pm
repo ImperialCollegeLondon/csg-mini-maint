@@ -460,14 +460,14 @@ sub maint_checkrunon
 {
     my( $scriptname, $list ) = @_;
 
-    maint_fatalerror( "maint_checkrunon() Parameter 2 must be a class list reference") unless defined $list && 
-    	ref( $list ) eq 'ARRAY';
+    #maint_fatalerror( "maint_checkrunon() Parameter 2 must be a class list reference") unless defined $list && 
+    #	ref( $list ) eq 'ARRAY';
 
     my @runon = _run_lookup( $scriptname, 'runon' );
     unless( @runon )
     {
         maint_warning( "No $scriptname:runon config key" );
-        return {};
+        return 0;
     }
     my $run = join( ',', @runon );
     maint_debug( "Runon entries for $scriptname: $run");
