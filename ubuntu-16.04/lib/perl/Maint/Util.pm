@@ -16,9 +16,6 @@ our %EXPORT_TAGS = (
             maint_checkrunon
             maint_lastlocktime
 	    maint_checktime
-	    maint_parsemods
-	    maint_ordermods
-	    maint_locatemods
 	    maint_mkarchpath
 	    maint_mkpath
 	    maint_readhash
@@ -66,9 +63,6 @@ Maint::Util - utilities for Maint scripts
 	maint_checkrunon
 	maint_lastlocktime
 	maint_checktime
-	maint_parsemods
-	maint_ordermods
-	maint_locatemods
 	maint_mkarchpath
 	maint_mkpath
 	maint_readhash
@@ -511,98 +505,6 @@ sub maint_checktime ($$)
     return 0 if $hour < $okstarthour && $hour > $okendhour;
   }
   return 1;
-}
-
-=head2 B<my $hashref = maint_parsemods( $modstring )>
-
-Parses a string for dotted suffix modifiers and returns a reference
-to a hashref containing the data collected from the modifiers.
-
-=cut
-
-sub maint_parsemods ($)
-{
-  my $modstring = basename($_[0]);
-  my @strparts = split(/\./, $modstring);
-  
-  my %data;
-  $data{'key'} = shift @strparts;
-
-  foreach my $mod (@strparts)
-  {
-    my( $key, $value ) = split(/\-/, $mod, 2);
-    if( $permittedmodifiers{$key} )
-    {
-      $data{$key} = $value;
-    } else
-    {
-      maint_warning( "Fake modifier key $key ignored in $modstring");
-    }
-  }
-
-  return \%data;
-}
-
-
-=head2 B<my @result = maint_ordermods( @modstrings )>
-
-Orders the @modstrings into strict precedence order FOR THIS HOST
-(i.e. arch-specific at this time). 
-Returns a list of lists in this strict order, including
-possible list elements where precedence is identical.
-
-=cut
-
-sub maint_ordermods (@)
-{
-  my @modstrings = @_;
-  my @orderedmod;
-  foreach my $mod (@modstrings)
-  {
-    my $mods = maint_parsemods($mod);
-    my $nmods = keys %$mods;
-
-    if( exists($mods->{'arch'}) )
-    {
-      # skip if not a candidate here
-      next if $mods->{'arch'} ne maint_getarch();
-
-      if( $nmods > 2)
-      {
-	push @{$orderedmod[0]}, $mod;
-      } else
-      {
-	push @{$orderedmod[1]}, $mod;
-      }
-    } elsif( $nmods > 1)
-    {
-      push @{$orderedmod[2]}, $mod;
-    } else
-    {
-      push @{$orderedmod[3]}, $mod;
-    }
-  }
-  return @orderedmod;
-}
-
-
-=head2 B<my @altered = maint_locatemods( $modstrings, $filter )>
-
-Return a list of strings - a subset of those in @$modstrings -
-which match the filter function. The filter function shall assume
-that $_ contains the expanded record of the modstring
-(result of maint_parsemods).
-
-=cut
-
-sub maint_locatemods ($&;)
-{
-  my( $modstrings, $filter ) = @_;
-  return grep {
-    local $_ = maint_parsemods($_);
-    $filter->();
-    # e.g. &$filter = sub {exists($_->{'comb'}) && ($_->{'comb'} eq 'stop')} 
-  } @$modstrings;
 }
 
 
