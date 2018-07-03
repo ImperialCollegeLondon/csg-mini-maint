@@ -254,7 +254,6 @@ sub maint_safeopen ($;$$$$)
 {
 	my( $filename, $mode, $uid, $gid, $nobackup ) = @_;
 
-	_init_config();
 	my $h = {};
 	local *FD;
 	my $basedir = dirname($filename);
@@ -879,8 +878,6 @@ Returns 1 if OK, otherwise 0;
 sub maint_saferuntriggers
 {
 	_init_config();
-	print "debug: runtriggers, safetriggerfile is $safetriggerfile\n";
-
 	unless( defined $safetriggerfile && $safetriggerfile &&
 		-f $safetriggerfile )
 	{
