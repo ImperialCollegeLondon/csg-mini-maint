@@ -170,7 +170,7 @@ sub copyinfile
 {
 	my( $srcfile, $destfile, $noextrafiles ) = @_;
 
-	#maint_warning( "Would copy file $srcfile to $destfile" ); return;
+	maint_warning( "Would copy file $srcfile to $destfile" ); return;
 	unless( -f $srcfile && -r $srcfile)
 	{
 		maint_warning( "$srcfile must be a readable plain file, skipping");
