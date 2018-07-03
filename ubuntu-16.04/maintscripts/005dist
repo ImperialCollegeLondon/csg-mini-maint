@@ -80,14 +80,14 @@ foreach my $srcdir (@distfiles)
 {
 	my $srcdirabs = File::Spec->rel2abs($srcdir, File::Spec->rootdir);
 	# $srcdir relative to dist/ directory
-	print "debug: srcdir=$srcdir, srcdirabs=$srcdirabs\n";
+	#print "debug: srcdir=$srcdir, srcdirabs=$srcdirabs\n";
 
 	$srcdir = File::Spec->abs2rel($srcdirabs, File::Spec->rootdir);
-	print "debug: srcdir changed to $srcdir\n";
+	#print "debug: srcdir changed to $srcdir\n";
 
 	# Cleaning up incase find left a ./ on the front
 	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
-	print "debug: srcfiledir=$srcfiledir\n";
+	#print "debug: srcfiledir=$srcfiledir\n";
 
 	my( $srcfilename, $mods ) = maint_choose( $distbase, $srcfiledir );
 
@@ -102,6 +102,8 @@ foreach my $srcdir (@distfiles)
 	#my $mods = maint_parsemods($srcfilename);
 
 	$destfile = "$destroot$destfile";
+
+	die "debug: chosen file $srcfilename, mods: ".Dumper($mods);
 
 	# Check if we actually want to delete the file
 	if( exists($mods->{action}) && $mods->{action} eq 'delete' )
