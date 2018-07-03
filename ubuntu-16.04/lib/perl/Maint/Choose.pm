@@ -140,7 +140,8 @@ sub maint_choose ($$)
     my( $distbase, $basedir ) = @_;
     my @classes = maint_listclasses();
 
-    die "debug: distbase=$distbase, basedir=$basedir\n";
+    #die "debug: distbase=$distbase, basedir=$basedir\n";
+    maint_info( "debug maint_choose: distbase=$distbase, basedir=$basedir" );
 
     unless( -d $basedir and -r $basedir )
     {
