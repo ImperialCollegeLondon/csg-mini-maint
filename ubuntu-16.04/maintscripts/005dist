@@ -85,7 +85,7 @@ foreach my $srcdir (@distfiles)
 	# Cleaning up incase find left a ./ on the front
 	#
 	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
-	my( $srcfilename, $props ) = maint_choose( $distbase, $srcfiledir );
+	my( $srcfilename, $mods ) = maint_choose( $distbase, $srcfiledir );
 
 	unless( defined $srcfilename )
 	{
