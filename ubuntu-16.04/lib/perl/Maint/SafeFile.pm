@@ -78,7 +78,6 @@ maint_safelink
 maint_tmpfile
 maint_safecopy
 maint_safedryrun
-maint_safetriggerfile
 maint_saferuntriggers
 maint_tmpfile
 maint_safedelete
@@ -868,22 +867,15 @@ Returns: 1 if success, 0 otherwise.
 
 For all the files which were sucessfully replaced (file are only replaced
 if their contents change) this check each file against the list in the
-triggers file and run the script in order listed in the file.
+triggers file and run any trigger actions (no more than once!) in order.
 
 Returns 1 if OK, otherwise 0;
-
-DCW comments Aug 2017:
-- why a damn XML file?  why not something simpler?
-- why no globbing supported?  eg. for /usr/local/share/ca-certificates/*.crt?
-- if I read this code right, the same action might be run twice, eg when
-  /etc/auto.homes AND /etc/auto.vol get updated.
-
-Suggest rewriting this function, and replacing the XML file, so it's simpler..
 
 =cut
 
 sub maint_saferuntriggers
 {
+	_init_config();
 	unless( defined $maint_safetriggerfile && $maint_safetriggerfile && -f $maint_safetriggerfile )
 	{
 		maint_log(LOG_DEBUG, "No triggers file specified");
