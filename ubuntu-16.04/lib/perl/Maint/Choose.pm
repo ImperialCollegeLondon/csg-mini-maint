@@ -137,10 +137,10 @@ the order of this host's hostclasses.
 
 sub maint_choose ($$)
 {
-    my( $distbase, $basedir ) = shift;
+    my( $distbase, $basedir ) = @_;
     my @classes = maint_listclasses();
 
-    die;
+    die "debug: distbase=$distbase, basedir=$basedir\n";
 
     unless( -d $basedir and -r $basedir )
     {
