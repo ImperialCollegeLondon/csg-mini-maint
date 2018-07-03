@@ -210,7 +210,7 @@ sub setmode
 
 	if( defined $mode )
 	{
-		maint_warning( "Would set mode $destfile to $mode" ); return;
+		#maint_warning( "Would set mode $destfile to $mode" ); return;
 		maint_debug( "Setting $destfile mode to " . sprintf ("%o", $mode));
 		unless( chmod( $mode, $destfile ) )
 		{
