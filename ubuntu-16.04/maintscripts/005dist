@@ -222,21 +222,20 @@ sub setmode
 
 sub setowner
 {
-        my ($srcfile, $destfile, $mods ) = @_;
-	maint_warning( "Would set owner $destfile, ". Dumper($mods) ); return;
-        unless ( -e $destfile )
+        my( $srcfile, $destfile, $mods ) = @_;
+        unless( -e $destfile )
         {
-                maint_warning( "setowner() - destination file does not exist: $destfile");
-		 return 0;
+		maint_warning( "setowner() - destination file does not exist: $destfile");
+		return 0;
         }
         my $owner = $mods->{'owner'};
 
 	return 1 unless defined( $owner );
 
-#	maint_warning( Dumper($mods) );
+	maint_warning( "Would set owner $destfile to $owner" ); return;
 
 	# Validate owner to be done later.
-	my ($login,$pass,$uid,$gid) = getpwnam($owner);
+	my( $login,$pass,$uid,$gid ) = getpwnam($owner);
 #                      or die "$owner not in passwd file";
 #	maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
 	return 0 unless defined $uid;
@@ -248,14 +247,15 @@ sub setowner
 sub setgroup
 {
         my( $srcfile, $destfile, $mods ) = @_;
-	maint_warning( "Would set group $destfile, ". Dumper($mods) ); return;
         unless( -e $destfile )
         {
-                 maint_warning( "setgroup() - destination file does not exist: $destfile");
+                 maint_warning( "setgroup() - destination file $destfile does not exist");
 		 return 0;
         }
         my $group = $mods->{'group'};
 	return 1 unless defined( $group );
+
+	maint_warning( "Would set group $destfile to $group" ); return;
 
 	# Validate group to be done later.
 	my $gid =  getgrnam($group);
