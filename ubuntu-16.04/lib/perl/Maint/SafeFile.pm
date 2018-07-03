@@ -182,7 +182,7 @@ sub maint_checkdiskspace($)
 #
 # _init_config();
 #	Read the safefile:triggers information from the ConfigInfo module.
-#	Store the filename in the module global variable
+#	Store the qualified filename in the module global variable
 #	$safetriggerfile
 #
 sub _init_config ()
@@ -190,6 +190,8 @@ sub _init_config ()
 	unless( defined $safetriggerfile )
 	{
 		$safetriggerfile = maint_getconfig( "safefile:triggers" );
+		my $confdir = maint_getconfigdir();
+		$safetriggerfile = "$confdir/$safetriggerfile";
 	}
 }
 
@@ -876,19 +878,16 @@ Returns 1 if OK, otherwise 0;
 sub maint_saferuntriggers
 {
 	_init_config();
-	unless( defined $safetriggerfile && $safetriggerfile )
+	print "debug: runtriggers, safetriggerfile is $safetriggerfile\n";
+
+	unless( defined $safetriggerfile && $safetriggerfile &&
+		-f $safetriggerfile )
 	{
-		maint_log(LOG_DEBUG, "No triggers file specified");
+		maint_log(LOG_WARNING, "No triggers file specified");
 		return 0;
 	}
-        my $confdir = maint_getconfigdir();
-        my $triggerfile = "$confdir/$safetriggerfile";
-	unless( -f $triggerfile )
-	{
-		maint_log(LOG_WARNING, "No triggers file $triggerfile");
-		return 0;
-	}
-	my $triggerdata = read_file( $triggerfile );
+
+	my $triggerdata = read_file( $safetriggerfile );
 	my $json = decode_json( $triggerdata );
 
 	my %files_renamed = map { $_ => 1 } @files_renamed_list;
