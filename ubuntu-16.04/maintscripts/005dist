@@ -1,0 +1,366 @@
+#!/usr/bin/perl
+
+# maint dist: Copy frequently updated but unpackaged files.
+
+=head1 NAME
+
+maint dist
+
+=head1 SYNOPSIS
+
+maint [standard-maint-args] dist
+
+=head1 DESCRIPTION
+
+This is used to distribute files to hosts based on class membership.
+
+Algorithm:
+
+1 Searches through dist for all directories containing one or more files.
+
+2 The candidate directory represent a file on the host relative to /
+
+3 The files in the directory are tested attempting to find the most specific
+match to one of the host's classes (including the short hostname)
+
+4 Assuming a match is echieved in (3), the contents of that file are used to
+replace the destination file on the host via Maint::SafeFile.
+
+Suppose you want to overwrite /etc/security/access.conf on all hosts
+in class SERVER but you have a special case for host spock:
+
+Your dist/ area will look like:
+
+dist/etc/security/access.conf/SERVER
+dist/etc/security/access.conf/spock
+
+which are both files containing the appropriate configs. In both cases,
+the contents will be used to overwrite /etc/security/access.conf
+
+Permissions on these files are not important - permissions are duplicated
+from the file which is being replaced.
+
+=head2 Options
+
+Standard maint args, no others.
+
+=cut
+
+use strict;
+use warnings;
+
+use File::Basename;
+use File::Find;
+use File::Spec;
+use File::Path;
+use Maint qw(:all);
+#use Maint::Run;
+use Cwd qw(abs_path getcwd);
+use Data::Dumper;
+
+
+sub get_dist_list ($);
+
+# Main code
+
+maint_init();
+
+maint_usage() unless @ARGV == 0;
+
+my $confdir = maint_getconfigdir();
+my $distbase = "$confdir/dist";
+maint_fatalerror( "No dist base $distbase!" ) unless -f $distbase;
+my $destroot = maint_getconfig( "dist:root" ) // "/";
+mkpath( [$destroot], 0, 0755 ) unless -d $destroot;
+maint_fatalerror( "No dist destination root!" ) unless -d $destroot;
+
+my @distfiles = get_dist_list( $distbase );
+
+foreach my $srcdir (@distfiles)
+{
+	my $srcdirabs = File::Spec->rel2abs($srcdir, File::Spec->rootdir);
+	# $srcdir relative to dist/ directory
+
+	$srcdir = File::Spec->abs2rel($srcdirabs, File::Spec->rootdir);
+	# Cleaning up incase find left a ./ on the front
+	#
+	my $srcfilename = maint_choose(File::Spec->rel2abs($srcdir, $distbase));
+	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
+	my @d = File::Spec->splitdir($srcdirabs);
+	my $destdir = File::Spec->catdir(@d[0..$#d-1]);
+	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
+	unless( defined $srcfilename )
+	{
+		maint_debug( "No candidate for $destfile, skipping");
+		next;
+	}
+
+	my $mods = maint_parsemods($srcfilename);
+
+	$destfile = "$destroot/$destfile";
+
+	# Check if we actually want to delete the file
+	if( exists($mods->{action}) && $mods->{action} eq 'delete' )
+	{
+		deletefile($destfile);
+		next;
+	}
+
+	# Prevent leaving .old files around.
+	# Should probably not leave .tmpnew around either..
+	my $noextrafiles =
+		( exists($mods->{backup}) && $mods->{backup} eq 'no' ) ? 1 : 0;
+
+	# Check if we actually want to make a symlink using the one
+	# line content of $srcfilename
+	if( exists($mods->{action}) && ($mods->{action} eq 'symlink' ) )
+	{
+		makesymlink($srcfilename, $destfile, $noextrafiles);
+		next;
+	}
+
+	# Otherwise it's a regular file write/update
+	next unless copyinfile($srcfilename, $destfile, $noextrafiles) &&
+		    setowner($srcfilename, $destfile, $mods) &&
+		    setgroup($srcfilename, $destfile, $mods) &&
+		    setmode($srcfilename, $destfile);
+}
+
+# All done.
+maint_exit();
+
+# Subroutines
+
+# my @p = get_dist_list($base);
+#	Finds all non-empty directories within $base
+sub get_dist_list ($)
+ {
+	my $base = shift;
+	my $pwd = getcwd();
+
+	maint_debug( "Determining files to dist from $base");
+	chdir($base) || maint_fatalerror( "Cannot cd into $base");
+	my @_find_files = ();
+	find(
+		sub {
+			if( $File::Find::name =~ m/\.svn/)
+			{
+				$File::Find::prune = 1;
+			} elsif( -f $_ )
+			{
+				push @_find_files, dirname( $File::Find::name );
+			}
+		}, '.');
+
+	chdir($pwd);
+
+	my %map = ();
+	map { $map{$_}++ } @_find_files;
+	return sort keys %map;
+}
+
+
+sub copyinfile
+{
+	my( $srcfile, $destfile, $noextrafiles ) = @_;
+
+	unless( -f $srcfile && -r $srcfile)
+	{
+		maint_warning( "$srcfile must be a readable plain file, skipping");
+		return 0;
+	}
+
+	my @d = File::Spec->splitdir ($destfile);
+	my $destdir = File::Spec->catdir (@d[0..$#d-1]);
+
+	unless( -d $destdir )
+	{
+		maint_info( "Making directory $destdir");
+		mkpath( [$destdir], 0, 0755 );
+		unless( -d $destdir )
+		{
+			maint_warning( "Unable to make directory $destdir, skipping");
+			return 0;
+		}
+	}
+	maint_debug( "Copying $srcfile to $destfile");
+
+	return maint_safecopy($srcfile, $destfile, undef, undef, undef, $noextrafiles);
+}
+
+sub setmode
+{
+	my ($srcfile, $destfile) = @_;
+	my $mode;
+	unless ( -e $destfile )
+	{
+		maint_warning( "setmode() - destination file does not exist: $destfile");
+		return 0;
+	}
+	my $mods = maint_parsemods($srcfile);
+	if (exists($mods->{mode}) && ($mods->{mode} =~ /[0-7]{3,4}/)) {
+		$mode = oct($mods->{mode});
+	}
+
+	if ( defined $mode )
+	{
+#		maint_warning( "setmode() - mode = $mode, destfile = $destfile" );
+		maint_debug( "Setting $destfile mode to " . sprintf ("%o", $mode));
+		unless (chmod ($mode, $destfile))
+		{
+			maint_warning( "Unable to chmod $destfile");
+			return 0;
+		}
+	}
+	return 1;
+}
+
+sub setowner
+{
+         my ($srcfile, $destfile, $mods ) = @_;
+         unless ( -e $destfile )
+         {
+                 maint_warning( "setowner() - destination file does not exist: $destfile");
+		 return 0;
+         }
+         my $owner = $mods->{'owner'};
+
+	 return 1 unless defined( $owner );
+
+#	 maint_warning( Dumper($mods) );
+
+	 # Validate owner to be done later.
+	 my ($login,$pass,$uid,$gid) = getpwnam($owner);
+#                       or die "$owner not in passwd file";
+#	 maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
+	 return 0 unless defined($uid);
+
+	 chown( $uid, -1, $destfile );
+	 return 1;
+}
+
+sub setgroup
+{
+         my( $srcfile, $destfile, $mods ) = @_;
+         unless( -e $destfile )
+         {
+                 maint_warning( "setgroup() - destination file does not exist: $destfile");
+		 return 0;
+         }
+         my $group = $mods->{'group'};
+	 return 1 unless defined( $group );
+
+#	 maint_warning( Dumper($mods) );
+
+	 # Validate group to be done later.
+	 my $gid =  getgrnam($group);
+#                       or die "$owner not in passwd file";
+#	 maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
+	 return 0 unless defined($gid);
+
+	 chown( -1, $gid, $destfile );
+	 return 1;
+}
+
+sub deletefile
+{
+	my( $dest ) = @_;
+	unless( -e $dest || -l $dest )
+	{
+		maint_debug( "deletefile() - destination file $dest does not exist" );
+		return 0;
+	}
+	maint_safedelete($dest);
+	return 1;
+}
+
+sub makesymlink
+{
+	my( $srcfile, $destfile, $noextrafiles ) = @_;
+
+	unless( -f $srcfile && -r $srcfile )
+	{
+		maint_warning( "$srcfile must be a readable plain file, skipping");
+		return 0;
+	}
+
+	my @d = File::Spec->splitdir($destfile);
+	my $destdir = File::Spec->catdir(@d[0..$#d-1]);
+
+	open( my $src, '<', $srcfile ) ||
+		maint_fatalerror( "Cannot open $srcfile for reading");
+	my @data = <$src>;
+	close $src;
+
+	maint_fatalerror( "$srcfile must contain only one line, ".
+		"containing the path being symlinked to") if @data != 1;
+
+	my $slink = $data[0];
+	chomp $slink;
+
+# [27-JUL-2012] ldk: Determine the absolute location of $slink so that *if*
+# it is expressed as a relative link (e.g. '../../foo/bar'), we can check
+# whether the target exists.
+
+	my $abs_slink = $slink;
+	my $true_loc = $srcfile;
+
+# Relative links do not begin with a '/'; only process if no leading '/'.
+
+	if(  $slink !~ /^\// )
+	{
+
+# Remove (1) The full $distbase and preceding prefix and (2) the last two
+# path components (the target file/directory and the host-class/action
+# specification) from $srcfile to get the target directory.  If, for example,
+# $srcfile is '/var/cache/sysmaint/development/vol/linux/ubuntu/14.04/dist/etc/chrome-browser/default/HOSTDOC.action-symlink.backup-no' then $trueloc is
+# '/etc/chrome-browser'
+
+		$true_loc =~ s/^.*$distbase(.*\/).*\/.*$/$1/;
+
+# Now append the sym-link reference to get an 'absolute' reference (which may
+# still contain relative elements.
+
+		$abs_slink = $true_loc . $slink;
+	}
+
+	# Invoke 'readlink -m -n' to make sure $abs_slink is canonical, even if
+	# path components do not (yet) exist.
+
+	runcmd(['/bin/readlink', '-m', '-n', "$abs_slink"],
+		undef, 1, undef, \$abs_slink, \*STDERR);
+	maint_warning( "[$abs_slink] does not exist for symlink [$destfile], ".
+		       "but symlinking to it anyway" )
+		unless -e $abs_slink;
+
+	unless( -d $destdir )
+	{
+		maint_info( "Making directory $destdir");
+		mkpath([$destdir], 0, 0755) ;
+		unless (-d $destdir)
+		{
+			maint_warning( "Unable to make directory $destdir - ".
+				"skipping");
+			return 0;
+		}
+	}
+ 	maint_debug( "Attempt to symlink $destfile pointing at $slink");
+
+	return maint_safelink($slink, $destfile, $noextrafiles);
+}
+
+=head1 AUTHORS
+
+Duncan White E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson E<lt>mwj@doc.ic.ac.ukE<gt>,
+David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
+Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
+Tim Southerwood, E<lt>ts@dionic.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003-2018 Department of Computing, Imperial College London
+
+=cut
+

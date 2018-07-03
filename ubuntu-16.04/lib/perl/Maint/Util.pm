@@ -43,7 +43,7 @@ our %permittedmodifiers = map { $_ => 1 }
 
 use Sys::Hostname;
 #use Sys::Hostname::Long;
-use Cwd;
+#use Cwd;
 use File::Basename;
 use File::Path;
 use IPC::Run3;
@@ -212,7 +212,7 @@ sub maint_runcmd ($;$$$$$)
 {
     my( $cmd, $overridedryrun, $errlevel, $stdin, $stdout, $stderr ) = @_;
     
-    maint_log(LOG_ERR, "cmd is not an array ref") unless ref $cmd eq 'ARRAY';
+    maint_fatalerror( "cmd is not an array ref") unless ref $cmd eq 'ARRAY';
     my $cmdstring = join ' ', @$cmd;
 
     $overridedryrun = 0 unless defined $overridedryrun;
@@ -237,11 +237,11 @@ sub maint_runcmd ($;$$$$$)
     
     if( !$overridedryrun && maint_dryrun() )
     {
-	maint_log(LOG_DEBUG, "Not running: $cmdstring");
+	maint_debug( "Not running: $cmdstring");
 	return -1;
     } else 
     {
-	maint_log(LOG_DEBUG, "Running: $cmdstring");
+	maint_debug( "Running: $cmdstring");
 	# mwj -- turn off die redirection for IPC::Run3
 	my $diehldr = $SIG{__DIE__};
 	$SIG{__DIE__} = 'DEFAULT';
@@ -327,7 +327,7 @@ sub maint_scriptname
 sub _runagain ($@)
 {
     my( $scriptname, @runwhen ) = @_;
-    maint_log(LOG_DEBUG, "Checking cron status for script $scriptname");
+    maint_debug( "Checking cron status for script $scriptname");
 
     my @crontimes = grep { /^cron-/ } @runwhen;
     return 0 unless @crontimes;
@@ -338,11 +338,11 @@ sub _runagain ($@)
 
     # Lookup last-run time
     my $lastrunfile = "$rundir/maint-$scriptname";
-    maint_log(LOG_DEBUG, "Checking for existence of $lastrunfile...");
+    maint_debug( "Checking for existence of $lastrunfile...");
     unless( -e "$lastrunfile" )
     {
         # If there's no last-run file, we need to run the script now.
-        maint_log(LOG_DEBUG, "No last-run file exists, returning cron=1");
+        maint_debug( "No last-run file exists, returning cron=1");
         return 1;
     }
     my $time    = time;
@@ -395,7 +395,7 @@ sub _runagain ($@)
     	}
     	# If we didn't understand the cron format, log that fact here
     	# and carry on.
-    	maint_log(LOG_WARNING, "Skipping bad $scriptname cron entry '$rule'.");
+    	maint_warning( "Skipping bad $scriptname cron entry '$rule'.");
     }
 	
     # Cron rules were specified, but none of them indicate a new run is
@@ -424,11 +424,11 @@ sub maint_runwhen
     my @runwhen = _run_lookup( $scriptname, 'runwhen' );
     unless( @runwhen )
     {
-        maint_log(LOG_WARNING, "No '$scriptname:runwhen' configuration entry");
+        maint_warning( "No '$scriptname:runwhen' configuration entry");
         return {};
     }
     my $runwhen = join( ',', @runwhen );
-    maint_log(LOG_DEBUG, "Runwhen entries for $scriptname: $runwhen");
+    maint_debug( "Runwhen entries for $scriptname: $runwhen");
 
     my %runwhen = map { $_ => 1 } @runwhen;
     my %results;
@@ -436,19 +436,13 @@ sub maint_runwhen
     $results{boot} = $runwhen{boot} ? 1 : 0;
     $results{install} = $runwhen{install} ? 1 : 0;
     $results{cron} = _runagain( $scriptname, @runwhen );
-    maint_log(LOG_DEBUG, "Run in: cron: " . $results{cron} . 
+    maint_debug( "Run in: cron: " . $results{cron} . 
 	    			"; boot: " . $results{boot} . 
 			       	"; install: " . $results{install} .
 				"; manual: 1");	
     return $results{$mode} // 0;
 }
 
-# Internal for function below
-sub _get_runonlist
-{
-    my $scriptname = shift;
-
-}
 
 =head2 B<my $run = maint_checkrunon( $scriptname, $classlist )>
 
@@ -466,17 +460,17 @@ sub maint_checkrunon
 {
     my( $scriptname, $list ) = @_;
 
-    maint_log(LOG_ERR, "maint_checkrunon() Parameter 2 must be a class list reference") unless defined $list && 
+    maint_fatalerror( "maint_checkrunon() Parameter 2 must be a class list reference") unless defined $list && 
     	ref( $list ) eq 'ARRAY';
 
     my @runon = _run_lookup( $scriptname, 'runon' );
     unless( @runon )
     {
-        maint_log(LOG_WARNING, "No $scriptname:runon config key" );
+        maint_warning( "No $scriptname:runon config key" );
         return {};
     }
     my $run = join( ',', @runon );
-    maint_log(LOG_DEBUG, "Runon entries for $scriptname: $run");
+    maint_debug( "Runon entries for $scriptname: $run");
 
     my %runon = map { $_ => 1 } @runon;
     
@@ -484,11 +478,11 @@ sub maint_checkrunon
     {
         if( $runon{$c} )
         {
-            maint_log(LOG_DEBUG, "Matched runon class $c");
+            maint_debug( "Matched runon class $c");
             return 1;
         }
     }
-    maint_log(LOG_DEBUG, "Cannot find runon class match");
+    maint_debug( "Cannot find runon class match");
     return 0;
 }
 
@@ -522,14 +516,13 @@ sub maint_checktime ($$)
 =head2 B<my $hashref = maint_parsemods( $modstring )>
 
 Parses a string for dotted suffix modifiers and returns a reference
-to a concrete structure containing the data collected from the
-modifiers.
+to a hashref containing the data collected from the modifiers.
 
 =cut
 
 sub maint_parsemods ($)
 {
-  my ($modstring) = basename($_[0]);
+  my $modstring = basename($_[0]);
   my @strparts = split(/\./, $modstring);
   
   my %data;
@@ -541,8 +534,9 @@ sub maint_parsemods ($)
     if( $permittedmodifiers{$key} )
     {
       $data{$key} = $value;
-    } else {
-      maint_log(LOG_WARNING, "Fake modifier key $key ignored in $modstring");
+    } else
+    {
+      maint_warning( "Fake modifier key $key ignored in $modstring");
     }
   }
 
@@ -552,9 +546,9 @@ sub maint_parsemods ($)
 
 =head2 B<my @result = maint_ordermods( @modstrings )>
 
-Orders the modified strings given in modstrings into strict
-precedence order FOR THIS HOST (i.e., arch-specific at this time. 
-Will return a list of lists in this strict order, including
+Orders the @modstrings into strict precedence order FOR THIS HOST
+(i.e. arch-specific at this time). 
+Returns a list of lists in this strict order, including
 possible list elements where precedence is identical.
 
 =cut
@@ -565,13 +559,13 @@ sub maint_ordermods (@)
   my @orderedmod;
   foreach my $mod (@modstrings)
   {
-    my $modst = maint_parsemods($mod);
-    my $nmods = keys %$modst;
+    my $mods = maint_parsemods($mod);
+    my $nmods = keys %$mods;
 
-    if( exists($modst->{'arch'}) )
+    if( exists($mods->{'arch'}) )
     {
       # skip if not a candidate here
-      next if $modst->{'arch'} ne maint_getarch();
+      next if $mods->{'arch'} ne maint_getarch();
 
       if( $nmods > 2)
       {
@@ -594,9 +588,9 @@ sub maint_ordermods (@)
 
 =head2 B<my @altered = maint_locatemods( $modstrings, $filter )>
 
-Return a list of modified strings selected from those provided in
-modstrings which match the filter function provides. The filter function
-shall assume that $_ contains the expanded record of the modstring
+Return a list of strings - a subset of those in @$modstrings -
+which match the filter function. The filter function shall assume
+that $_ contains the expanded record of the modstring
 (result of maint_parsemods).
 
 =cut
@@ -623,7 +617,7 @@ the two inputs provided.
 
 sub maint_mkarchpath ($$)
 {
-	my ($arch, $tail) = @_;
+	my( $arch, $tail ) = @_;
 
 	my $maintroot = maint_getconfig( "maintroot" );
 	my $cattail = File::Spec->catfile(@$tail);
@@ -717,7 +711,7 @@ sub maint_getarch ()
 	chomp $arch;
 	if( $? != 0 )
 	{
-		maint_log(LOG_ERR, "Cannot run /bin/uname -m to determine architecture!!");
+		maint_fatalerror( "Cannot run /bin/uname -m to determine architecture!!");
 		return undef;
 	}
 
