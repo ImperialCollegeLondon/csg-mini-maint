@@ -90,6 +90,7 @@ foreach my $srcdir (@distfiles)
 	#print "debug: srcfiledir=$srcfiledir\n";
 
 	my( $srcfilename, $mods ) = maint_choose( $distbase, $srcfiledir );
+	#my $mods = maint_parsemods($srcfilename);
 
 	unless( defined $srcfilename )
 	{
@@ -99,9 +100,11 @@ foreach my $srcdir (@distfiles)
 	my $destdir = dirname( $srcdirabs );
 	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
 
-	#my $mods = maint_parsemods($srcfilename);
+	my $showmods = join( ',', map { "$_=$mods->{$_}" } sort keys %$mods );
 
 	$destfile = "$destroot$destfile";
+
+	maint_info( "debug: chosen file $srcfilename, mods=$showmods" );
 
 	#die "debug: chosen file $srcfilename, mods: ".Dumper($mods);
 
