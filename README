@@ -45,8 +45,12 @@ we come up with.
 
 INITIAL GOALS:
 
-1). maint dist
+0). maint hello  - achieved Monday 2nd July, with approx 4200 lines of Perl
+
+1). maint dist   - achieved Tuesday 3rd July, now approx 4700 lines.
+
 2). maint aptitude
+
 3). maint useraccounts
 
 	duncan white
