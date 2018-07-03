@@ -50,7 +50,7 @@ use Maint::ScriptArgs qw(:all);
 use Maint::ConfigInfo qw(:all);
 use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
-#use Maint::Config qw(:all);
+use Maint::Choose qw(:all);
 
 INIT
 {
@@ -64,6 +64,7 @@ INIT
 		Maint::ConfigInfo->export_to_level(1, __PACKAGE__, ':all');
 		Maint::HostClass->export_to_level(1,  __PACKAGE__, ':all');
 		Maint::SafeFile->export_to_level(1,   __PACKAGE__, ':all');
+		Maint::Choose->export_to_level(1,     __PACKAGE__, ':all');
 	}
 }
 
