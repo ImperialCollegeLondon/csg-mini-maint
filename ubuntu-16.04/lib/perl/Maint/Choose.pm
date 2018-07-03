@@ -122,29 +122,31 @@ sub maint_getproperties ($$)
 }
 
 
-=head2 B<my( $path, $props ) = maint_choose( $distbase, $basedir )>
+=head2 B<my( $path, $props ) = maint_choose( $distbase, $under )>
 
 This takes $distbase, the base of the dist tree, eg. .../dist, and
-$basedir, the absolute path of a directory name in the $distbase,
-(eg .../dist/etc/security/access.conf), and searches $basedir for the
+$under, the relative path of a directory name under the $distbase,
+(eg etc/security/access.conf), and searches $distbase/$under for the
 most-precisely matching hostclass file, and also figures out which
 properties should apply to that file.
 
-Returns a fully-qualified path to the chosen file, and a hashref $props
-of properties that apply to that file.  Returns ( undef, undef ) on failure.
+Returns the relative path of the chosen file, of the form "$under/$hostclass",
+and a hashref $props of properties that apply to that file.
+Returns ( undef, undef ) on failure.
 
-e.g. it searches for $basedir/hostname, $basedir/LAB, $basedir/DOC, in
-the order of this host's hostclasses.
+e.g. it searches for $under/hostname, $under/LAB, $under/DOC, in
+the order of this host's hostclasses, all under $distbase.
 
 =cut
 
 sub maint_choose ($$)
 {
-    my( $distbase, $basedir ) = @_;
+    my( $distbase, $under ) = @_;
     my @classes = maint_listclasses();
 
-    #die "debug: distbase=$distbase, basedir=$basedir\n";
-    maint_debug( "debug maint_choose: distbase=$distbase, basedir=$basedir" );
+    #die "debug: distbase=$distbase, under=$under\n";
+    my $basedir = "$distbase/$under";
+    maint_debug( "debug maint_choose: distbase=$distbase, under=$under, basedir=$basedir" );
 
     unless( -d $basedir and -r $basedir )
     {
@@ -153,23 +155,14 @@ sub maint_choose ($$)
     }
     foreach my $class (@classes)
     {
-        my $classfile = maint_mkpath($basedir,$class);
-	my @classfiles = glob("$classfile.*");
-	push @classfiles, $classfile if -f $classfile;
-	my $n = @classfiles;
+        my $classfile = "$distbase/$under/$class";
+	my @g = glob("$classfile.*");
+	maint_fatalerror( "found $classfile.* classfiles @g" )
+		if @g > 0;
 
-	if( $n > 1 )
-	{
-		maint_warning( "maint_choose: $n files match $classfile, skipping" );
-		next;
-	}
-
-	if( $n == 1 )
-	{
-		my $result = $classfiles[0];
-		my %props = maint_getproperties( $distbase, $result );
-		return ( $result, \%props );
-	}
+	next unless -f $classfile;
+	my %props = maint_getproperties( $distbase, $classfile );
+	return ( "$under/$class", \%props );
     }
     return ( undef, undef );
 }

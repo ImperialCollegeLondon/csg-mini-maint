@@ -78,38 +78,27 @@ my @distfiles = get_dist_list( $distbase );
 
 foreach my $srcdir (@distfiles)
 {
-	my $srcdirabs = File::Spec->rel2abs($srcdir, File::Spec->rootdir);
-	# $srcdir relative to dist/ directory
-	#print "debug: srcdir=$srcdir, srcdirabs=$srcdirabs\n";
+	#print "debug: srcdir=$srcdir\n";
 
-	$srcdir = File::Spec->abs2rel($srcdirabs, File::Spec->rootdir);
-	#print "debug: srcdir changed to $srcdir\n";
-
-	# Cleaning up incase find left a ./ on the front
-	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
-	#print "debug: srcfiledir=$srcfiledir\n";
-
-	my( $srcfilename, $mods ) = maint_choose( $distbase, $srcfiledir );
-	#my $mods = maint_parsemods($srcfilename);
+	my( $srcfilename, $props ) = maint_choose( $distbase, $srcdir );
 
 	unless( defined $srcfilename )
 	{
 		maint_debug( "No candidate for $srcdir, skipping");
 		next;
 	}
-	my $destdir = dirname( $srcdirabs );
-	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
 
-	my $showmods = join( ',', map { "$_=$mods->{$_}" } sort keys %$mods );
+	my $showprops = join( ',',
+		map { "$_=$props->{$_}" }
+			sort keys %$props );
 
-	$destfile = "$destroot$destfile";
+	my $destdir = dirname( $srcfilename );
+	my $destfile = "$destroot$srcfilename";
 
-	maint_info( "debug: chosen file $srcfilename, mods=$showmods" );
-
-	#die "debug: chosen file $srcfilename, mods: ".Dumper($mods);
+	maint_info( "debug: chosen file $srcfilename, props=$showprops" );
 
 	# Check if we actually want to delete the file
-	if( exists($mods->{action}) && $mods->{action} eq 'delete' )
+	if( exists($props->{action}) && $props->{action} eq 'delete' )
 	{
 		deletefile($destfile);
 		next;
@@ -118,11 +107,11 @@ foreach my $srcdir (@distfiles)
 	# Prevent leaving .old files around.
 	# Should probably not leave .tmpnew around either..
 	my $noextrafiles =
-		( exists($mods->{backup}) && $mods->{backup} eq 'no' ) ? 1 : 0;
+		( exists($props->{backup}) && $props->{backup} eq 'no' ) ? 1 : 0;
 
 	# Check if we actually want to make a symlink using the one
 	# line content of $srcfilename
-	if( exists($mods->{action}) && ($mods->{action} eq 'symlink' ) )
+	if( exists($props->{action}) && ($props->{action} eq 'symlink' ) )
 	{
 		makesymlink($srcfilename, $destfile, $noextrafiles);
 		next;
@@ -130,8 +119,8 @@ foreach my $srcdir (@distfiles)
 
 	# Otherwise it's a regular file write/update
 	next unless copyinfile($srcfilename, $destfile, $noextrafiles) &&
-		    setowner($srcfilename, $destfile, $mods) &&
-		    setgroup($srcfilename, $destfile, $mods) &&
+		    setowner($srcfilename, $destfile, $props) &&
+		    setgroup($srcfilename, $destfile, $props) &&
 		    setmode($srcfilename, $destfile);
 }
 
@@ -141,7 +130,8 @@ maint_exit();
 # Subroutines
 
 # my @p = get_dist_list($base);
-#	Finds all non-empty directories within $base
+#	Finds all non-empty directories under $base,
+#	returns relative pathnames with no "./"
 sub get_dist_list ($)
 {
 	my $base = shift;
@@ -157,7 +147,9 @@ sub get_dist_list ($)
 				$File::Find::prune = 1;
 			} elsif( -f $_ )
 			{
-				push @files, dirname( $File::Find::name );
+				my $dir = dirname( $File::Find::name );
+				$dir =~ s|^\./||;
+				push @files, $dir;
 			}
 		}, '.');
 
@@ -200,15 +192,15 @@ sub copyinfile
 sub setmode
 {
 	my( $srcfile, $destfile ) = @_;
-	my $mods = maint_parsemods($srcfile);
+	my $props = maint_parsemods($srcfile);
 	unless( -e $destfile )
 	{
 		maint_warning( "setmode() - destination file $destfile does not exist");
 		return 0;
 	}
 	my $mode;
-	$mode = oct($mods->{mode}) if
-		exists $mods->{mode} && ($mods->{mode} =~ /[0-7]{3,4}/);
+	$mode = oct($props->{mode}) if
+		exists $props->{mode} && ($props->{mode} =~ /[0-7]{3,4}/);
 
 	if( defined $mode )
 	{
@@ -225,13 +217,13 @@ sub setmode
 
 sub setowner
 {
-        my( $srcfile, $destfile, $mods ) = @_;
+        my( $srcfile, $destfile, $props ) = @_;
         unless( -e $destfile )
         {
 		maint_warning( "setowner() - destination file does not exist: $destfile");
 		return 0;
         }
-        my $owner = $mods->{'owner'};
+        my $owner = $props->{'owner'};
 
 	return 1 unless defined( $owner );
 
@@ -249,13 +241,13 @@ sub setowner
 
 sub setgroup
 {
-        my( $srcfile, $destfile, $mods ) = @_;
+        my( $srcfile, $destfile, $props ) = @_;
         unless( -e $destfile )
         {
                  maint_warning( "setgroup() - destination file $destfile does not exist");
 		 return 0;
         }
-        my $group = $mods->{'group'};
+        my $group = $props->{'group'};
 	return 1 unless defined( $group );
 
 	maint_warning( "Would set group $destfile to $group" ); return;
