@@ -91,6 +91,7 @@ $oldfile_suffix = '.old' and $special_suffix = '-special'.
 
 use Maint::Log qw(:all);
 use Maint::Util qw(:all);
+use Maint::ConfigInfo qw(:all);
 use POSIX;
 use File::stat;
 use Fcntl qw(:DEFAULT F_SETFD F_GETFD);
