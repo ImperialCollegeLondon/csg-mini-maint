@@ -126,7 +126,7 @@ foreach my $srcdir (@distfiles)
 	next unless copyinfile($srcfilename, $destfile, $noextrafiles) &&
 		    setowner($srcfilename, $destfile, $props) &&
 		    setgroup($srcfilename, $destfile, $props) &&
-		    setmode($srcfilename, $destfile);
+		    setmode($srcfilename, $destfile, $props);
 }
 
 # All done.
@@ -194,10 +194,11 @@ sub copyinfile
 	return maint_safecopy($srcfile, $destfile, undef, undef, undef, $noextrafiles);
 }
 
+
 sub setmode
 {
-	my( $srcfile, $destfile ) = @_;
-	my $props = maint_parsemods($srcfile);
+	my( $srcfile, $destfile, $props ) = @_;
+	#my $props = maint_parsemods($srcfile);
 	unless( -e $destfile )
 	{
 		maint_warning( "setmode() - destination file $destfile does not exist");
@@ -220,6 +221,7 @@ sub setmode
 	return 1;
 }
 
+
 sub setowner
 {
         my( $srcfile, $destfile, $props ) = @_;
@@ -232,7 +234,11 @@ sub setowner
 
 	return 1 unless defined( $owner );
 
-	maint_warning( "Would set owner $destfile to $owner" ); return;
+	if( $> != 0 )
+	{
+		maint_warning( "Would set owner $destfile to $owner if root" );
+		return;
+	}
 
 	# Validate owner to be done later.
 	my( $login,$pass,$uid,$gid ) = getpwnam($owner);
@@ -243,6 +249,7 @@ sub setowner
 	chown( $uid, -1, $destfile );
 	return 1;
 }
+
 
 sub setgroup
 {
@@ -255,7 +262,11 @@ sub setgroup
         my $group = $props->{'group'};
 	return 1 unless defined( $group );
 
-	maint_warning( "Would set group $destfile to $group" ); return;
+	if( $> != 0 )
+	{
+		maint_warning( "Would set group $destfile to $group if root" );
+		return;
+	}
 
 	# Validate group to be done later.
 	my $gid =  getgrnam($group);
@@ -270,7 +281,9 @@ sub setgroup
 sub deletefile
 {
 	my( $dest ) = @_;
+
 	maint_warning( "Would delete file $dest" ); return;
+
 	unless( -e $dest || -l $dest )
 	{
 		maint_debug( "deletefile() - destination file $dest does not exist" );
