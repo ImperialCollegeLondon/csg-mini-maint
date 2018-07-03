@@ -16,7 +16,6 @@ our %EXPORT_TAGS = (
 			maint_safelink
 			maint_safecopy
 			maint_safedryrun
-			maint_safetriggerfile
 			maint_saferuntriggers
 			maint_safeprint
 			maint_safedelete
@@ -63,14 +62,13 @@ package Maint::SafeFile;
   maint_safelink
   maint_safecopy
   maint_safedryrun
-  maint_safetriggerfile
   maint_saferuntriggers
   maint_safeprint
   maint_safedelete
 
 =head1 EXPORT
 
-None by default, :all will export:
+None by default, :all will export the following subset:
 
 maint_initsafe
 maint_safeopen
@@ -182,27 +180,20 @@ sub maint_checkdiskspace($)
 }
 
 
-=head2 B<maint_safetriggerfile( $maint_safetriggerfile )>
-=head2 B<my $triggerfile = maint_safetriggerfile()>
-
-Returns (and optionally sets) the current maint_safetriggerfile.
-
-=cut
-
-sub maint_safetriggerfile(;$)
+#
+# _init_config();
+#	Read the safefile:triggers information from the ConfigInfo module.
+#	Store the filename in the module global variable
+#	$maint_safetriggerfile
+#
+sub _init_config ()
 {
-	my $p = shift;
-	if( defined $p )
+	unless( defined $maint_safetriggerfile )
 	{
-		$maint_safetriggerfile = $p;
-		unless( -f $p )
-		{
-			maint_log(LOG_ERR, "Cannot set safetriggerfile to [$p], file does not exist");
-		}
-		maint_log(LOG_DEBUG, "Setting safetriggerfile to [$maint_safetriggerfile]");
+		$maint_safetriggerfile = maint_getconfig( "safefile:triggers" );
 	}
-	return $maint_safetriggerfile;
 }
+
 
 # Internal to decide if we are allowed to touch the file due to existence of a
 # -special suffix. We don't care what type of node the -special is, just
@@ -260,6 +251,8 @@ If the path to the file does not exist, required directories are made.
 sub maint_safeopen ($;$$$$)
 {
 	my( $filename, $mode, $uid, $gid, $nobackup ) = @_;
+
+	_init_config();
 	my $h = {};
 	local *FD;
 	my $basedir = dirname($filename);
@@ -875,8 +868,7 @@ Returns: 1 if success, 0 otherwise.
 
 For all the files which were sucessfully replaced (file are only replaced
 if their contents change) this check each file against the list in the
-triggers file set by maint_safetriggerfile() and run the script in order
-listed in the file.
+triggers file and run the script in order listed in the file.
 
 Returns 1 if OK, otherwise 0;
 

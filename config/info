@@ -7,6 +7,7 @@
 	"cachedir":		"/tmp/minimaint",
 	"lockdir":		"/tmp/minimaint.lock",
 	"rundir":		"/tmp/minimaint.run",
+	"safefile:triggers":	"file:safe_file_triggers.json",
 	"hello:runwhen":	"boot,cron-60m",
 	"hello:runon":		"ALLHOSTS",
 	"goodbye:runwhen":	"cron-15m",
