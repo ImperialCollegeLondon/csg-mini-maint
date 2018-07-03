@@ -92,15 +92,12 @@ foreach my $srcdir (@distfiles)
 		maint_debug( "No candidate for $srcfilename, skipping");
 		next;
 	}
-
-	#my @d = File::Spec->splitdir($srcdirabs);
-	#my $destdir = File::Spec->catdir(@d[0..$#d-1]);
 	my $destdir = dirname( $srcdirabs );
-
 	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
+
 	my $mods = maint_parsemods($srcfilename);
 
-	$destfile = "$destroot/$destfile";
+	$destfile = "$destroot$destfile";
 
 	# Check if we actually want to delete the file
 	if( exists($mods->{action}) && $mods->{action} eq 'delete' )
@@ -146,7 +143,7 @@ sub get_dist_list ($)
 	my @files = ();
 	find(
 		sub {
-			if( $File::Find::name =~ m/\.svn/)
+			if( $File::Find::name =~ m/\.(svn|git)$/)
 			{
 				$File::Find::prune = 1;
 			} elsif( -f $_ )
@@ -174,8 +171,6 @@ sub copyinfile
 		return 0;
 	}
 
-	#my @d = File::Spec->splitdir ($destfile);
-	#my $destdir = File::Spec->catdir (@d[0..$#d-1]);
 	my $destdir = dirname( $destfile );
 
 	unless( -d $destdir )
@@ -288,9 +283,6 @@ sub makesymlink
 		maint_warning( "$srcfile must be a readable plain file, skipping");
 		return 0;
 	}
-
-	#my @d = File::Spec->splitdir($destfile);
-	#my $destdir = File::Spec->catdir(@d[0..$#d-1]);
 	my $destdir = dirname( $destfile );
 
 	open( my $src, '<', $srcfile ) ||
