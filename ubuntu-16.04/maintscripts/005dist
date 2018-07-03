@@ -195,25 +195,24 @@ sub copyinfile
 
 sub setmode
 {
-	my ($srcfile, $destfile) = @_;
-	my $mode;
+	my( $srcfile, $destfile ) = @_;
 	my $mods = maint_parsemods($srcfile);
-	maint_warning( "Would set mode $destfile, ". Dumper($mods) ); return;
 	unless( -e $destfile )
 	{
 		maint_warning( "setmode() - destination file $destfile does not exist");
 		return 0;
 	}
+	my $mode;
 	$mode = oct($mods->{mode}) if
 		exists $mods->{mode} && ($mods->{mode} =~ /[0-7]{3,4}/);
 
 	if( defined $mode )
 	{
-#		maint_warning( "setmode() - mode = $mode, destfile = $destfile" );
+		maint_warning( "Would set mode $destfile to $mode" ); return;
 		maint_debug( "Setting $destfile mode to " . sprintf ("%o", $mode));
-		unless (chmod ($mode, $destfile))
+		unless( chmod( $mode, $destfile ) )
 		{
-			maint_warning( "Unable to chmod $destfile");
+			maint_warning( "Unable to chmod $mode $destfile");
 			return 0;
 		}
 	}
