@@ -89,7 +89,7 @@ foreach my $srcdir (@distfiles)
 
 	unless( defined $srcfilename )
 	{
-		maint_debug( "No candidate for $destfile, skipping");
+		maint_debug( "No candidate for $srcfilename, skipping");
 		next;
 	}
 
