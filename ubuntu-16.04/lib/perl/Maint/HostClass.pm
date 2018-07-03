@@ -345,7 +345,7 @@ sub _class_merge ($) {
     
 sub _class_linearise ($$)
 {
-	my ($class, $classtable) = @_;
+	my( $class, $classtable ) = @_;
 	my @classes;
 	my $mergelist = [];
 	my $linear;
@@ -358,52 +358,12 @@ sub _class_linearise ($$)
 	push @$mergelist, $parents;
 
 	$linear = _class_merge ($mergelist);
-	return undef unless defined ($linear);
+	return undef unless defined $linear;
 	unshift @$linear, $class;
 
 	return $linear;
 }
 
-sub _class_linearise_all ($)
-{
-	my ($classtable) = @_;
-	my %lin_cache = ();
-	my %host_memory = ();
-	my $mergelist;
-	my $linear;
-	my $parents;
-	my $result = [];
-
-	foreach (@$classtable)
-	{
-		my $class = $_->{child};
-		next if exists ($host_memory{$class});
-		$host_memory{$class} = 1;
-	   	$mergelist = [];
-		$parents = _class_parents($class, $classtable);
-
-		foreach (@$parents)
-		{
-			if (exists $lin_cache{$_})
-			{
-				push @$mergelist, $lin_cache{$_};
-			} else
-			{
-				my $r = _class_linearise($_, $classtable);
-				$lin_cache{$_} = $r;
-				push @$mergelist, $r;
-			}
-		}
-		push @$mergelist, $parents;
-
-		$linear = _class_merge ($mergelist);
-		return undef unless defined ($linear);
-		unshift @$linear, $class;
-		push @$result, $linear;
-	}
-
-	return $result;
-}
 
 # setup all the classes information. Called automatically on demand
 # Returns ref to the list of classes or undef on error
@@ -439,15 +399,15 @@ sub _class_setup ($)
             return undef;
         }
 	foreach (@$linear) 
-    { 
-        print $fd "$_\n"; 
-    }
-	unless (maint_safeclose($handle))
-    {
-        maint_log(LOG_ERR, "Cannot safe_close $hostclassfile");
-        return undef;
-    }
-    return $linear;
+        { 
+            print $fd "$_\n"; 
+        }
+	unless( maint_safeclose($handle) )
+        {
+            maint_log(LOG_ERR, "Cannot safe_close $hostclassfile");
+            return undef;
+        }
+        return $linear;
 }
 
 sub _classes_from_file
