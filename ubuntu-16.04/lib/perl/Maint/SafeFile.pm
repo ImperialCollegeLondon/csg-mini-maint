@@ -32,7 +32,7 @@ use Maint::Util qw(:all);
 
 # Package globals
 our $maint_safedryrun       = 0;
-our $maint_safetriggerfile = '';
+our $safetriggerfile = '';
 our @files_renamed_list = ();          # Used to store the list of every file
 				       # changed for real. Upon running the
 				       # safe_end() will check against list of
@@ -183,13 +183,13 @@ sub maint_checkdiskspace($)
 # _init_config();
 #	Read the safefile:triggers information from the ConfigInfo module.
 #	Store the filename in the module global variable
-#	$maint_safetriggerfile
+#	$safetriggerfile
 #
 sub _init_config ()
 {
-	unless( defined $maint_safetriggerfile )
+	unless( defined $safetriggerfile )
 	{
-		$maint_safetriggerfile = maint_getconfig( "safefile:triggers" );
+		$safetriggerfile = maint_getconfig( "safefile:triggers" );
 	}
 }
 
@@ -876,12 +876,19 @@ Returns 1 if OK, otherwise 0;
 sub maint_saferuntriggers
 {
 	_init_config();
-	unless( defined $maint_safetriggerfile && $maint_safetriggerfile && -f $maint_safetriggerfile )
+	unless( defined $safetriggerfile && $safetriggerfile )
 	{
 		maint_log(LOG_DEBUG, "No triggers file specified");
 		return 0;
 	}
-	my $triggerdata = read_file( $maint_safetriggerfile );
+        my $confdir = maint_getconfigdir();
+        my $triggerfile = "$confdir/$safetriggerfile";
+	unless( -f $triggerfile )
+	{
+		maint_log(LOG_WARN, "No triggers file $triggerfile");
+		return 0;
+	}
+	my $triggerdata = read_file( $triggerfile );
 	my $json = decode_json( $triggerdata );
 
 	my %files_renamed = map { $_ => 1 } @files_renamed_list;
