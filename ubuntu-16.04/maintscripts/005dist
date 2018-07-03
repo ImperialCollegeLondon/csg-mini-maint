@@ -134,13 +134,13 @@ maint_exit();
 # my @p = get_dist_list($base);
 #	Finds all non-empty directories within $base
 sub get_dist_list ($)
- {
+{
 	my $base = shift;
 	my $pwd = getcwd();
 
 	maint_debug( "Determining files to dist from $base");
 	chdir($base) || maint_fatalerror( "Cannot cd into $base");
-	my @_find_files = ();
+	my @files = ();
 	find(
 		sub {
 			if( $File::Find::name =~ m/\.svn/)
@@ -148,14 +148,14 @@ sub get_dist_list ($)
 				$File::Find::prune = 1;
 			} elsif( -f $_ )
 			{
-				push @_find_files, dirname( $File::Find::name );
+				push @files, dirname( $File::Find::name );
 			}
 		}, '.');
 
 	chdir($pwd);
 
 	my %map = ();
-	map { $map{$_}++ } @_find_files;
+	map { $map{$_}++ } @files;
 	return sort keys %map;
 }
 
@@ -164,6 +164,7 @@ sub copyinfile
 {
 	my( $srcfile, $destfile, $noextrafiles ) = @_;
 
+	maint_warning( "Would copy file $srcfile to $destfile" ); return;
 	unless( -f $srcfile && -r $srcfile)
 	{
 		maint_warning( "$srcfile must be a readable plain file, skipping");
@@ -192,17 +193,17 @@ sub setmode
 {
 	my ($srcfile, $destfile) = @_;
 	my $mode;
-	unless ( -e $destfile )
+	my $mods = maint_parsemods($srcfile);
+	maint_warning( "Would set mode $destfile, ". Dumper($mods) ); return;
+	unless( -e $destfile )
 	{
-		maint_warning( "setmode() - destination file does not exist: $destfile");
+		maint_warning( "setmode() - destination file $destfile does not exist");
 		return 0;
 	}
-	my $mods = maint_parsemods($srcfile);
-	if (exists($mods->{mode}) && ($mods->{mode} =~ /[0-7]{3,4}/)) {
-		$mode = oct($mods->{mode});
-	}
+	$mode = oct($mods->{mode}) if
+		exists $mods->{mode} && ($mods->{mode} =~ /[0-7]{3,4}/);
 
-	if ( defined $mode )
+	if( defined $mode )
 	{
 #		maint_warning( "setmode() - mode = $mode, destfile = $destfile" );
 		maint_debug( "Setting $destfile mode to " . sprintf ("%o", $mode));
@@ -217,54 +218,55 @@ sub setmode
 
 sub setowner
 {
-         my ($srcfile, $destfile, $mods ) = @_;
-         unless ( -e $destfile )
-         {
-                 maint_warning( "setowner() - destination file does not exist: $destfile");
+        my ($srcfile, $destfile, $mods ) = @_;
+	maint_warning( "Would set owner $destfile, ". Dumper($mods) ); return;
+        unless ( -e $destfile )
+        {
+                maint_warning( "setowner() - destination file does not exist: $destfile");
 		 return 0;
-         }
-         my $owner = $mods->{'owner'};
+        }
+        my $owner = $mods->{'owner'};
 
-	 return 1 unless defined( $owner );
+	return 1 unless defined( $owner );
 
-#	 maint_warning( Dumper($mods) );
+#	maint_warning( Dumper($mods) );
 
-	 # Validate owner to be done later.
-	 my ($login,$pass,$uid,$gid) = getpwnam($owner);
-#                       or die "$owner not in passwd file";
-#	 maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
-	 return 0 unless defined($uid);
+	# Validate owner to be done later.
+	my ($login,$pass,$uid,$gid) = getpwnam($owner);
+#                      or die "$owner not in passwd file";
+#	maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
+	return 0 unless defined $uid;
 
-	 chown( $uid, -1, $destfile );
-	 return 1;
+	chown( $uid, -1, $destfile );
+	return 1;
 }
 
 sub setgroup
 {
-         my( $srcfile, $destfile, $mods ) = @_;
-         unless( -e $destfile )
-         {
+        my( $srcfile, $destfile, $mods ) = @_;
+	maint_warning( "Would set group $destfile, ". Dumper($mods) ); return;
+        unless( -e $destfile )
+        {
                  maint_warning( "setgroup() - destination file does not exist: $destfile");
 		 return 0;
-         }
-         my $group = $mods->{'group'};
-	 return 1 unless defined( $group );
+        }
+        my $group = $mods->{'group'};
+	return 1 unless defined( $group );
 
-#	 maint_warning( Dumper($mods) );
+	# Validate group to be done later.
+	my $gid =  getgrnam($group);
+#                      or die "$owner not in passwd file";
+#	maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
+	return 0 unless defined $gid;
 
-	 # Validate group to be done later.
-	 my $gid =  getgrnam($group);
-#                       or die "$owner not in passwd file";
-#	 maint_warning( "setowner() - login=$login, uid=$uid, destfile=$destfile");
-	 return 0 unless defined($gid);
-
-	 chown( -1, $gid, $destfile );
-	 return 1;
+	chown( -1, $gid, $destfile );
+	return 1;
 }
 
 sub deletefile
 {
 	my( $dest ) = @_;
+	maint_warning( "Would delete file $dest" ); return;
 	unless( -e $dest || -l $dest )
 	{
 		maint_debug( "deletefile() - destination file $dest does not exist" );
