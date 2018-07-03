@@ -139,6 +139,9 @@ sub maint_choose ($$)
 {
     my( $distbase, $basedir ) = shift;
     my @classes = maint_listclasses();
+
+    die;
+
     unless( -d $basedir and -r $basedir )
     {
         maint_warning( "maint_choose: $basedir is not a readable directory");
