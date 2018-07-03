@@ -31,8 +31,8 @@ use File::Spec;
 use Maint::Util qw(:all);
 
 # Package globals
-our $maint_safedryrun       = 0;
-our $safetriggerfile = '';
+our $maint_safedryrun   = 0;
+our $safetriggerfile    = undef;
 our @files_renamed_list = ();          # Used to store the list of every file
 				       # changed for real. Upon running the
 				       # safe_end() will check against list of
