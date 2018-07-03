@@ -84,18 +84,18 @@ foreach my $srcdir (@distfiles)
 	$srcdir = File::Spec->abs2rel($srcdirabs, File::Spec->rootdir);
 	# Cleaning up incase find left a ./ on the front
 	#
-	my $srcfilename = maint_choose(File::Spec->rel2abs($srcdir, $distbase));
 	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
+	my( $srcfilename, $props ) = maint_choose( $distbase, $srcfiledir );
 
 	unless( defined $srcfilename )
 	{
-		maint_debug( "No candidate for $srcfilename, skipping");
+		maint_debug( "No candidate for $srcdir, skipping");
 		next;
 	}
 	my $destdir = dirname( $srcdirabs );
 	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
 
-	my $mods = maint_parsemods($srcfilename);
+	#my $mods = maint_parsemods($srcfilename);
 
 	$destfile = "$destroot$destfile";
 

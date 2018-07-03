@@ -1,0 +1,3 @@
+# A list file for DoC experimental packages
+deb http://apt.doc.ic.ac.uk/ubuntu/xenial/aptly/public/local-experimental/ xenial main
+deb-src http://apt.doc.ic.ac.uk/ubuntu/xenial/aptly/public/local-experimental/ xenial main

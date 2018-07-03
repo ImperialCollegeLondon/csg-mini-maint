@@ -1,0 +1,7 @@
+# This host is a member of the AUTOSECURITYPKG class, and so will pull down 
+# packages from the live upstream package repository for security updates, 
+# in addition to those packages blessed locally.
+
+# Ubuntu 16.04 Security
+deb http://www.mirrorservice.org/sites/archive.ubuntu.com/ubuntu xenial-security main restricted universe multiverse
+deb-src http://www.mirrorservice.org/sites/archive.ubuntu.com/ubuntu xenial-security main restricted universe multiverse

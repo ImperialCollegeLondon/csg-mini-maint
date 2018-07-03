@@ -1,0 +1,20 @@
+# This file makes sure that Opera Browser is kept up-to-date
+# as part of regular system upgrades
+
+# CSG have commented this line out so that Opera is not upgraded
+# unexpectedly.  Furthermore, enabling this option can cause delays
+# when 'apt-get update' or 'aptitude update' is called.  If you want to
+# enable this option, you will need root privileges on your machine:
+# 1) ksu to root.
+# 2) touch /etc/apt/sources.list.d/opera.list-special
+# 3) uncomment the line below.
+
+# deb http://deb.opera.com/opera/ stable non-free #Opera Browser (final releases)
+
+
+# The line above will make sure you get all final public releases.
+# Uncomment the following line if you want to get alpha and beta
+# releases, too.
+
+# CSG: the line below was original commented out.  We have not changed it.
+# deb http://deb.opera.com/opera-beta/ stable non-free #Opera Browser (beta releases)

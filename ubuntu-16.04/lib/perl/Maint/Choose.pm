@@ -9,6 +9,7 @@ our %EXPORT_TAGS = (
     'all' => [
         qw(
               maint_choose
+	      maint_getproperties
           )
     ]
 );
@@ -26,13 +27,15 @@ use Maint::Util qw(:all);
 
 =head1 NAME
 
-Maint::Choose - choose the most hostclass-specific file in a tree
+Maint::Choose - choose the most hostclass-specific file in a tree, and
+read the properties that apply to that file.
 
 =head1 SYNOPSIS
 
     use Maint::Choose qw(:all);
 
     maint_choose
+    maint_getproperties
 
 =head1 EXPORT
 
@@ -71,44 +74,97 @@ sub _make_choice(@)
 }
 
 
-=head2 B<my $path = maint_choose( $basedir )>
+=head2 B<my %props = maint_getproperties( $distbase, $path )>
 
-This takes a directory name and searches that directory for the
-best-matching file using the standard class-modifier naming scheme,
-returning a fully-qualified path to that file.
+This takes $distbase, the base of the dist tree, eg. .../dist, and
+$path, the absolute path of a file name in the $distbase, and
+figures out which properties should apply to that file by reading
+.props files.
 
-e.g. it searches for $dir/hostname, $dir/LAB, $dir/DOC, ...
-
-It returns undef on failure or the filename with full path
+It returns a properties hash, empty if no .props files are found in
+the path from $distbase to $path..
 
 =cut
 
-sub maint_choose ($)
+sub maint_getproperties ($$)
 {
-    my $basedir = shift;
+	my( $distbase, $path ) = @_;
+
+	$path =~ s|^$distbase/||;	# remove the distbase prefix..
+
+	maint_info( "Getting properties for chosen file $path under $distbase" );
+	-d $distbase ||
+		maint_fatalerror( "getproperties: no such distbase $distbase" );
+
+	my $dir = $distbase;
+	my %props;
+	my @above;
+
+	foreach my $name (split(m|/|,$path) )
+	{
+		$dir .= "/$name";
+		-d $dir ||
+			maint_fatalerror( "getproperties: no such dir $dir" );
+		my $pfile = "$dir/.props";
+		-f $pfile || next;
+
+		# ok, found a .props file.. read it..
+		my %newprops = maint_readhash( $pfile );
+
+		# and merge %newprops into %props
+		@props{keys %newprops} = values %newprops;
+	}
+
+	return %props;
+}
+
+
+=head2 B<my( $path, $props ) = maint_choose( $distbase, $basedir )>
+
+This takes $distbase, the base of the dist tree, eg. .../dist, and
+$basedir, the absolute path of a directory name in the $distbase,
+(eg .../dist/etc/security/access.conf), and searches $basedir for the
+most-precisely matching hostclass file, and also figures out which
+properties should apply to that file.
+
+Returns a fully-qualified path to the chosen file, and a hashref $props
+of properties that apply to that file.  Returns ( undef, undef ) on failure.
+
+e.g. it searches for $basedir/hostname, $basedir/LAB, $basedir/DOC, in
+the order of this host's hostclasses.
+
+=cut
+
+sub maint_choose ($$)
+{
+    my( $distbase, $basedir ) = shift;
     my @classes = maint_listclasses();
     unless( -d $basedir and -r $basedir )
     {
         maint_warning( "maint_choose: $basedir is not a readable directory");
-        return undef;
+        return ( undef, undef );
     }
     foreach my $class (@classes)
     {
         my $classfile = maint_mkpath($basedir,$class);
 	my @classfiles = glob("$classfile.*");
 	push @classfiles, $classfile if -f $classfile;
+	my $n = @classfiles;
 
-	# We do NOT want files with a 'comb' tag.
-	
-	my @orderedfiles = maint_ordermods(
-		               maint_locatemods(\@classfiles,
-			                        sub {!exists($_->{'comb'})}
-						)
-					  );
-	my $result = _make_choice(@orderedfiles);
-	return $result if defined $result;
+	if( $n > 1 )
+	{
+		maint_warning( "maint_choose: $n files match $classfile, skipping" );
+		next;
+	}
+
+	if( $n == 1 )
+	{
+		my $result = $classfiles[0];
+		my %props = maint_getproperties( $distbase, $result );
+		return ( $result, \%props );
+	}
     }
-    return undef;
+    return ( undef, undef );
 }
 
 
