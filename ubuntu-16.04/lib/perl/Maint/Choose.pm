@@ -90,7 +90,7 @@ sub maint_getproperties ($$)
 {
 	my( $distbase, $path ) = @_;
 
-	maint_info( "Getting properties for chosen file $path" );
+	maint_debug( "Getting properties for chosen file $path" );
 
 	$path =~ s|^$distbase/||;	# remove the distbase prefix..
 	$path = dirname($path);		# remove the hostclass filename suffix
