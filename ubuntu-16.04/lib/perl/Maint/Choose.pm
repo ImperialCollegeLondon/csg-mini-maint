@@ -91,6 +91,7 @@ sub maint_getproperties ($$)
 	my( $distbase, $path ) = @_;
 
 	$path =~ s|^$distbase/||;	# remove the distbase prefix..
+	$path = dirname($path);		# remove the hostclass filename suffix
 
 	maint_info( "Getting properties for chosen file $path under $distbase" );
 	-d $distbase ||
@@ -141,7 +142,7 @@ sub maint_choose ($$)
     my @classes = maint_listclasses();
 
     #die "debug: distbase=$distbase, basedir=$basedir\n";
-    maint_info( "debug maint_choose: distbase=$distbase, basedir=$basedir" );
+    maint_debug( "debug maint_choose: distbase=$distbase, basedir=$basedir" );
 
     unless( -d $basedir and -r $basedir )
     {
