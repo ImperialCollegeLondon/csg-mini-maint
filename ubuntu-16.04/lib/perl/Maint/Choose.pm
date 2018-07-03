@@ -23,7 +23,7 @@ use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
 use Maint::Util qw(:all);
-#use File::Spec;
+use File::Path;
 
 =head1 NAME
 
