@@ -86,15 +86,18 @@ foreach my $srcdir (@distfiles)
 	#
 	my $srcfilename = maint_choose(File::Spec->rel2abs($srcdir, $distbase));
 	my $srcfiledir = File::Spec->rel2abs($srcdir, $distbase);
-	my @d = File::Spec->splitdir($srcdirabs);
-	my $destdir = File::Spec->catdir(@d[0..$#d-1]);
-	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
+
 	unless( defined $srcfilename )
 	{
 		maint_debug( "No candidate for $destfile, skipping");
 		next;
 	}
 
+	#my @d = File::Spec->splitdir($srcdirabs);
+	#my $destdir = File::Spec->catdir(@d[0..$#d-1]);
+	my $destdir = dirname( $srcdirabs );
+
+	my $destfile = $srcdirabs; # The source directory path minus the config class file = the destination file name
 	my $mods = maint_parsemods($srcfilename);
 
 	$destfile = "$destroot/$destfile";
@@ -164,15 +167,16 @@ sub copyinfile
 {
 	my( $srcfile, $destfile, $noextrafiles ) = @_;
 
-	maint_warning( "Would copy file $srcfile to $destfile" ); return;
+	#maint_warning( "Would copy file $srcfile to $destfile" ); return;
 	unless( -f $srcfile && -r $srcfile)
 	{
 		maint_warning( "$srcfile must be a readable plain file, skipping");
 		return 0;
 	}
 
-	my @d = File::Spec->splitdir ($destfile);
-	my $destdir = File::Spec->catdir (@d[0..$#d-1]);
+	#my @d = File::Spec->splitdir ($destfile);
+	#my $destdir = File::Spec->catdir (@d[0..$#d-1]);
+	my $destdir = dirname( $destfile );
 
 	unless( -d $destdir )
 	{
@@ -286,8 +290,9 @@ sub makesymlink
 		return 0;
 	}
 
-	my @d = File::Spec->splitdir($destfile);
-	my $destdir = File::Spec->catdir(@d[0..$#d-1]);
+	#my @d = File::Spec->splitdir($destfile);
+	#my $destdir = File::Spec->catdir(@d[0..$#d-1]);
+	my $destdir = dirname( $destfile );
 
 	open( my $src, '<', $srcfile ) ||
 		maint_fatalerror( "Cannot open $srcfile for reading");
