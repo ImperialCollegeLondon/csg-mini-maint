@@ -885,7 +885,7 @@ sub maint_saferuntriggers
         my $triggerfile = "$confdir/$safetriggerfile";
 	unless( -f $triggerfile )
 	{
-		maint_log(LOG_WARN, "No triggers file $triggerfile");
+		maint_log(LOG_WARNING, "No triggers file $triggerfile");
 		return 0;
 	}
 	my $triggerdata = read_file( $triggerfile );
