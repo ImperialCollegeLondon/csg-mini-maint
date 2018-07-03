@@ -92,10 +92,15 @@ foreach my $srcdir (@distfiles)
 		map { "$_=$props->{$_}" }
 			sort keys %$props );
 
+	$srcfilename = "/$srcfilename";
+
 	my $destdir = dirname( $srcfilename );
 	my $destfile = "$destroot$srcfilename";
 
 	maint_info( "debug: chosen file $srcfilename, props=$showprops" );
+
+	# abs path now for file testing
+	$srcfilename = "$distbase$srcfilename";
 
 	# Check if we actually want to delete the file
 	if( exists($props->{action}) && $props->{action} eq 'delete' )
