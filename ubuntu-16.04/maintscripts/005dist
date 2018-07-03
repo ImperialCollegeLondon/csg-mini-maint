@@ -103,7 +103,7 @@ foreach my $srcdir (@distfiles)
 
 	$destfile = "$destroot$destfile";
 
-	die "debug: chosen file $srcfilename, mods: ".Dumper($mods);
+	#die "debug: chosen file $srcfilename, mods: ".Dumper($mods);
 
 	# Check if we actually want to delete the file
 	if( exists($mods->{action}) && $mods->{action} eq 'delete' )
