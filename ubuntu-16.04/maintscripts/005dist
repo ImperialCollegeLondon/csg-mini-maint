@@ -88,7 +88,7 @@ foreach my $srcdir (@distfiles)
 		next;
 	}
 
-	die "debug: properties are ". Dumper($props);
+	die "debug: srcfilename:$srcfilename, properties are ". Dumper($props);
 
 	my $showprops = join( ',',
 		map { "$_=$props->{$_}" }
