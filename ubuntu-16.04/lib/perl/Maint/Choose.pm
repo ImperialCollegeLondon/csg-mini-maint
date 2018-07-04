@@ -9,8 +9,6 @@ our %EXPORT_TAGS = (
     'all' => [
         qw(
               maint_choose
-              maint_parseproperties
-	      maint_getproperties
           )
     ]
 );
@@ -28,16 +26,13 @@ use File::Basename;
 
 =head1 NAME
 
-Maint::Choose - choose the most hostclass-specific file in a tree, and
-read the properties that apply to that file.
+Maint::Choose - choose the most hostclass-specific file in a tree.
 
 =head1 SYNOPSIS
 
     use Maint::Choose qw(:all);
 
     maint_choose
-    maint_parseproperties
-    maint_getproperties
 
 =head1 EXPORT
 
@@ -48,137 +43,40 @@ None by default, :all will export maint_choose().
 =cut
 
 
-=head2 B<my %props = maint_parseproperties( $string )>
+=head2 B<my $path = maint_choose( $choicedir )>
 
-Parses $string for dotted suffix modifiers (of the form .key-value...)
-and returns a property hash.
+This takes $choicedir, a leaf-directory that contains no subdirectories,
+but which contains one or more files named for hostclasses, and searches
+$choicedir for the most-precisely matching hostclass file given the
+hostclasses this host is in.
 
-=cut
+Returns the path of the chosen file, of the form "$choicedir/$hostclass".
+Returns undef on failure.
 
-our %permittedprop = map { $_ => 1 }
-	qw(arch mode action backup owner group);
-
-sub maint_parseproperties ($)
-{
-  my $string = basename($_[0]);
-  maint_debug( "parseprops: string $string" );
-  my @strparts = split(/\./, $string);
-
-  shift @strparts;	# discard the filename
-
-  my %props;
-  foreach my $str (@strparts)
-  {
-    my( $key, $value ) = split(/[-=]/, $str, 2);
-    next unless $permittedprop{$key} && defined $value;
-    $props{$key} = $value;
-    maint_debug( " parseprops: found prop $key, value $value" );
-  }
-
-  return %props;
-}
-
-=head2 B<my %props = maint_getproperties( $distbase, $srcpath )>
-
-This takes $distbase, the base of the dist tree, eg. .../dist, and
-$srcpath, the absolute path of a file name in the $distbase, and
-figures out which properties should apply to that file by reading
-.props files.
-
-It returns a properties hash, empty if no .props files are found in
-the path from $distbase to $path..
+e.g. it searches for $choicedir/hostname, $choicedir/LAB, $choicedir/DOC, in
+the order of this host's hostclasses.
 
 =cut
 
-sub maint_getproperties ($$)
+sub maint_choose ($)
 {
-	my( $distbase, $srcpath ) = @_;
-
-	maint_debug( "Getting properties for chosen file $srcpath" );
-
-	my $path = $srcpath;
-	$path =~ s|^$distbase/||;	# remove the distbase prefix..
-	$path = dirname($path);		# remove the hostclass filename suffix
-	maint_debug( "Getting properties: chosen path altered to $path" );
-
-	-d $distbase ||
-		maint_fatalerror( "getproperties: no such distbase $distbase" );
-
-	my $dir = $distbase;
-	my %props;
-
-	foreach my $name (split(m|/|,$path) )
-	{
-		$dir .= "/$name";
-		-d $dir ||
-			maint_fatalerror( "getproperties: no such dir $dir" );
-		my $pfile = "$dir/.props";
-		-f $pfile || next;
-
-		# ok, found a .props file.. read it..
-		my %newprops = maint_readhash( $pfile );
-
-		# and merge %newprops into %props
-		@props{keys %newprops} = values %newprops;
-	}
-	# merge in any .key-value.. properties at the end of the $srcpath
-	my %newprops = maint_parseproperties( $srcpath );
-	@props{keys %newprops} = values %newprops;
-
-	# sanitise: remove any unknown properties
-	foreach my $k (keys %props)
-	{
-	    delete $props{$k} unless $permittedprop{$k};
-	}
-
-	return %props;
-}
-
-
-=head2 B<my( $path, $props ) = maint_choose( $distbase, $under )>
-
-This takes $distbase, the base of the dist tree, eg. .../dist, and
-$under, the relative path of a directory name under the $distbase,
-(eg etc/security/access.conf), and searches $distbase/$under for the
-most-precisely matching hostclass file, and also figures out which
-properties should apply to that file.
-
-Returns the relative path of the chosen file, of the form "$under/$hostclass",
-and a hashref $props of properties that apply to that file.
-Returns ( undef, undef ) on failure.
-
-e.g. it searches for $under/hostname, $under/LAB, $under/DOC, in
-the order of this host's hostclasses, all under $distbase.
-
-=cut
-
-sub maint_choose ($$)
-{
-    my( $distbase, $under ) = @_;
+    my( $choicedir ) = @_;
     my @classes = maint_listclasses();
 
-    #die "debug: distbase=$distbase, under=$under\n";
-    my $basedir = "$distbase/$under";
-    maint_debug( "debug maint_choose: distbase=$distbase, under=$under, basedir=$basedir" );
+    maint_debug( "debug maint_choose: choicedir=$choicedir" );
 
-    unless( -d $basedir and -r $basedir )
+    unless( -d $choicedir and -r $choicedir )
     {
-        maint_warning( "maint_choose: $basedir is not a readable directory");
-        return ( undef, undef );
+        maint_warning( "maint_choose: $choicedir is not a readable directory");
+        return undef;
     }
     foreach my $class (@classes)
     {
-        my $classfile = "$distbase/$under/$class";
-	my @g = glob("$classfile.*");
-	push @g, $classfile if -f $classfile;
-	maint_fatalerror( "found $classfile.* classfiles @g" ) if @g > 1;
-
-	next if @g==0;
-	my %props = maint_getproperties( $distbase, $g[0] );
-	$g[0] =~ s|^$distbase/||;
-	return ( $g[0], \%props );
+        my $classfile = "$choicedir/$class";
+	next unless -f $classfile;
+	return $classfile;
     }
-    return ( undef, undef );
+    return undef;
 }
 
 

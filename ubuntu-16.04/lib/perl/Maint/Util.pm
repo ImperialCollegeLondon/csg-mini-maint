@@ -304,12 +304,21 @@ work.
 
 =cut
 
+our $_scriptname;
+
 sub maint_scriptname
 {
+    return $_scriptname if defined $_scriptname;
+
     my $progpath = Cwd::abs_path($0);
+
+    print "debug: scriptname: progpath=$progpath, dollar0=$0\n";
+
     my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
     #my $name = basename( $progpath );
     $name =~ s/^\d+//;
+
+    $_scriptname = $name;
     return $name;
 }
 

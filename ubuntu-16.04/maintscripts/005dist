@@ -73,7 +73,9 @@ my $destroot = maint_getconfig( "dist:root" ) // "/";
 mkpath( [$destroot], 0, 0755 ) unless -d $destroot;
 maint_fatalerror( "No dist destination root!" ) unless -d $destroot;
 
-my @distfiles = get_dist_list( $distbase );
+my @distfiles = maint_distpaths( $distbase );
+
+maint_fatalerror( "distfiles are: ". Dumper( \@distfiles ) );
 
 foreach my $srcdir (@distfiles)
 {

@@ -112,6 +112,8 @@ sub fullclone ($$$)
 {
 	my( $git, $giturl, $repodest ) = @_;
 
+	my $origdir = getcwd();
+
 	print "Clone failed; retrying from first principles...\n";
 	system("rm -rf $repodest");
 	mkpath([$repodest], 0, 0755);
@@ -119,6 +121,8 @@ sub fullclone ($$$)
 
 	system("$git clone --depth 1 --quiet $giturl $repodest") == 0 ||
 		die "Clone still failed, failed\n";
+
+	chdir( $origdir );
 }
 
 
@@ -185,15 +189,19 @@ sub bootstrap()
 	my $origdir = getcwd();
 
 	# Make sure we're sitting somewhere safe.
-	chdir("/");
+	# DCW not now, chdir("/");
 
 	# set up our PATH to make sure life is sane
 	$ENV{PATH} = '/bin:/sbin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin';
 	mkpath( [$cachedir], 0, 0755) unless -d $cachedir;
 
-	print "Syncing local cache...\n";
-	loadcache( $gitrepo, $cachedir );
-	$maintroot = $cachedir;
+	# DCW not now, use local files..
+	#print "Syncing local cache...\n";
+	#loadcache( $gitrepo, $cachedir );
+	#$maintroot = $cachedir;
+
+	$maintroot = "$origdir/..";
+	print "debug bootstrap: maintroo=$maintroot\n";
 
 	$perllibpath = "$maintroot/$distribution/lib/perl";
 #
@@ -252,7 +260,8 @@ sub findscripts()
 {
 	my @results = ();
 	my %seen = ();
-	my $scriptdir = "$maintroot/$distribution/$scriptsubdir";
+	#DCW no local my $scriptdir = "$maintroot/$distribution/$scriptsubdir";
+	my $scriptdir = "$scriptsubdir";
 
 	# Scan the directory
 	maint_debug( "Opening script directory $scriptdir");
@@ -327,7 +336,7 @@ maint_debug( "scripts to run: ". join(' ',@scripts) ) if @scripts;
 # Check if root.
 #DCWdie "minimaint: need to run as root\n" if $> != 0;
 
-maint_initlog("maint system in $cachedir (production mode)");
+maint_initlog("maint system (development mode)");
 
 my @scriptinfo = findscripts();
 
