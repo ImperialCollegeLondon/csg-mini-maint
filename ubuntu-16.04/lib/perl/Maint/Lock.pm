@@ -70,7 +70,7 @@ sub maint_lockname
 	my $p = shift;
 	if( defined $p )
 	{
-		maint_log(LOG_ERR, "Bad lock name: $p") unless length $p && $p !~ m/\//;
+		maint_fatalerror( "Bad lock name: $p") unless length $p && $p !~ m/\//;
 		$lock_name = $p;
 	}
 	return $lock_name;
@@ -88,7 +88,7 @@ sub _init_config ()
 {
 	$lock_dir //= maint_getconfig( "lockdir" );
 
-	maint_log(LOG_ERR, "Lock name not set")
+	maint_fatalerror( "Lock name not set")
 	  unless defined $lock_name && $lock_name;
 }
 
@@ -108,13 +108,13 @@ sub maint_getlocktime
 	my $lockfile = "$lock_dir/$lock_name";
 	unless( -f $lockfile )
 	{
-		maint_log(LOG_DEBUG, "Lock file not created before");
+		maint_debug( "Lock file not created before");
 		return undef;
 	}
 
 	my @x = stat( $lockfile );
 	my $mtime = $x[9];
-	maint_log(LOG_DEBUG, "Lock file last set at " . localtime($mtime));
+	maint_debug( "Lock file last set at " . localtime($mtime));
 	return $mtime;
 }
 
@@ -133,20 +133,20 @@ sub maint_setlock
 	{
 		unless( File::Path::mkpath([$lock_dir], 0, 0755) )
 		{
-			maint_log(LOG_ERR, "Unable to create lock dir: $lock_dir");
+			maint_fatalerror( "Unable to create lock dir: $lock_dir");
 		}
 	}
 	my $lockfile = "$lock_dir/$lock_name";
 	unless( sysopen($lock_fh, $lockfile, O_WRONLY | O_TRUNC | O_CREAT) )
 	{
-		maint_log(LOG_ERR, "Cannot open lock file $lock_dir/$lock_name - $!");
+		maint_fatalerror( "Cannot open lock file $lock_dir/$lock_name - $!");
 	}
 	unless( flock($lock_fh, LOCK_EX | LOCK_NB) )
 	{
-		maint_log(LOG_WARNING, "Cannot get lock: $lock_name - $!");
+		maint_warning( "Cannot get lock: $lock_name - $!");
 		return 0;
 	}
-	maint_log(LOG_WARNING, "Got lock: $lock_name");
+	maint_warning( "Got lock: $lock_name");
 	return 1;
 }
 
@@ -165,20 +165,20 @@ sub maint_clearlock
 
 	unless( defined $lock_fh )
 	{
-		maint_log(LOG_WARNING, "Lock $lock_name not locked!");
+		maint_warning( "Lock $lock_name not locked!");
 		return 0;
 	}
 	unless( flock($lock_fh, LOCK_UN) )
 	{
-		maint_log(LOG_WARNING, "Cannot release lock: $lock_name - $!");
+		maint_warning( "Cannot release lock: $lock_name - $!");
 		return 0;
 	}
 	unless( close($lock_fh) )
 	{
-		maint_log(LOG_WARNING, "Problem closing lock file $lock_name - $!");
+		maint_warning( "Problem closing lock file $lock_name - $!");
 	}
 	undef $lock_fh;
-	maint_log(LOG_DEBUG, "Released lock: $lock_name");
+	maint_debug( "Released lock: $lock_name");
 	return 1;
 }
 

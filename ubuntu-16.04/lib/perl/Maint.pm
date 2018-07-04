@@ -165,32 +165,32 @@ sub maint_init
 	maint_lastlocktime($lastlocktime);
 	unless( maint_setlock() )
 	{
-		maint_log(LOG_WARNING, "Cannot acquire lock - cancelling this script run");
+		maint_warning( "Cannot acquire lock - cancelling this script run");
 		$correctly_exited = 1;
 		exit();
 	}
-	maint_log(LOG_DEBUG, "Acquired lock on this script");
+	maint_debug( "Acquired lock on this script");
 	my $scriptpath = Cwd::abs_path($0);
 	my $scriptdir  = dirname($scriptpath);
-	maint_log(LOG_WARNING, "Cannot get script base directory")
+	maint_warning( "Cannot get script base directory")
 		unless defined $scriptdir;
-	chdir($scriptdir) || maint_log(LOG_ERR, "Cannot chdir to [$scriptdir]");
-	maint_log(LOG_DEBUG, "chdir'd to $scriptdir");
+	chdir($scriptdir) || maint_fatalerror( "Cannot chdir to [$scriptdir]");
+	maint_debug( "chdir'd to $scriptdir");
 
 	# Check if we're to skip based on modetime
 	my $mode = maint_getattr('mode');
 	unless( maint_runwhen($scriptname, $mode) )
 	{
-		maint_log(LOG_DEBUG, "Skipping due to skipwhen constraint");
+		maint_debug( "Skipping due to skipwhen constraint");
 		maint_exit(1);
 		exit(0);
 	}
 	maint_reloadclasses(1);
 	my @classlist = maint_listclasses();
-	maint_log(LOG_ERR, "Cannot get class list") unless @classlist > 0;
+	maint_fatalerror( "Cannot get class list") unless @classlist > 0;
 	unless( maint_checkrunon($scriptname, \@classlist) )
 	{
-		maint_log(LOG_DEBUG, "Skipping due to runon constraint");
+		maint_debug( "Skipping due to runon constraint");
 		maint_exit(1);
 		exit(0);
 	}
@@ -205,7 +205,7 @@ sub maint_init
 
 	if( maint_getattr('dryrun') )
 	{
-		maint_log(LOG_INFO, "This script is in dry run mode. ".
+		maint_info( "This script is in dry run mode. ".
 			"Nothing will actually happen. Pass --nodryrun ".
 			"if you don't want this" );
 	}
@@ -237,15 +237,15 @@ sub maint_exit
 	unless( $skiptriggers )
 	{
 		maint_saferuntriggers()
-	  		|| maint_log(LOG_WARNING, "Problem running safe_action_triggers()");
+	  		|| maint_warning( "Problem running safe_action_triggers()");
 	}
 	unless( maint_clearlock() )
 	{
-		maint_log(LOG_WARNING, "Cannot relinquish lock correctly");
+		maint_warning( "Cannot relinquish lock correctly");
 	}
 	else
 	{
-		maint_log(LOG_DEBUG, "Relinquished lock on this script");
+		maint_debug( "Relinquished lock on this script");
 	}
 	maint_closelog();    # Shut down logging with a nice exit message.
 	$correctly_exited = 1;
@@ -301,7 +301,7 @@ END
 
 	# Oh dear - someone didn't bother calling maint_exit properly.
 	# We'll do it and shout at them...
-	maint_log(LOG_WARNING, "SCRIPT EXITED UNSAFELY -- NO maint_exit() CALL!")
+	maint_warning( "SCRIPT EXITED UNSAFELY -- NO maint_exit() CALL!")
 		unless maint_isexitforced();
 	maint_exit();
 }
