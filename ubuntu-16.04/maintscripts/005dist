@@ -99,7 +99,7 @@ foreach my $srcdir (@distfiles)
 	my $destdir = dirname( $srcfilename );
 	my $destfile = "$destroot$destdir";
 
-	if( $path =~ /nginx/ )
+	if( $srcfilename =~ /nginx/ )
 	{
 		maint_warning( "chosen file $srcfilename, props=$showprops, dest $destfile" );
 	}
