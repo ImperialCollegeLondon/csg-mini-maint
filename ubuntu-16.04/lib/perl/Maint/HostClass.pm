@@ -193,6 +193,7 @@ sub _class_getall ($)
     {
     	chomp;
 	my @r = split( /\s*,\s*/, $_ );
+	$r[2] //= 50;
 	my $row = { parent => $r[0], child => $r[1], priority => $r[2] };
 	push @$r, $row;
     }
@@ -349,7 +350,7 @@ sub _class_linearise ($$)
 	my @classes;
 	my $mergelist = [];
 	my $linear;
-	my $parents = _class_parents ($class, $classtable);
+	my $parents = _class_parents( $class, $classtable );
 
 	foreach (@$parents)
 	{
@@ -357,7 +358,7 @@ sub _class_linearise ($$)
 	}
 	push @$mergelist, $parents;
 
-	$linear = _class_merge ($mergelist);
+	$linear = _class_merge( $mergelist );
 	return undef unless defined $linear;
 	unshift @$linear, $class;
 
@@ -365,7 +366,8 @@ sub _class_linearise ($$)
 }
 
 
-# setup all the classes information. Called automatically on demand
+# setup all the classes information, i.e. store the linear hostclass list
+# in the appropriate hostclass file. Called automatically on demand
 # Returns ref to the list of classes or undef on error
 sub _class_setup ($)
 {
@@ -400,7 +402,7 @@ sub _class_setup ($)
         }
 	foreach (@$linear) 
         { 
-            print $fd "$_\n"; 
+            print $fd "$_\n" if $_;
         }
 	unless( maint_safeclose($handle) )
         {
