@@ -350,9 +350,9 @@ sub makesymlink
 
 	maint_runcmd(['/bin/readlink', '-m', '-n', "$abs_slink"],
 		undef, 1, undef, \$abs_slink, \*STDERR);
-	maint_warning( "[$abs_slink] does not exist for symlink [$destfile], ".
-		       "but symlinking to it anyway" )
-		unless -e $abs_slink;
+	#maint_warning( "[$abs_slink] does not exist for symlink [$destfile], ".
+	#	       "but symlinking to it anyway" )
+	#	unless -e $abs_slink;
 
 	unless( -d $destdir )
 	{
