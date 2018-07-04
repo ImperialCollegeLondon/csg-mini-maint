@@ -112,11 +112,17 @@ sub loadconfig()
 		die "maint_init: can't slurp config file $file\n";
 	my $configdata = decode_json( $text );
 	#die Dumper $configdata;
+	$cachedir = $configdata->{cachedir} || die "maint_init: no config cachedir (first time)\n";
+
+	# DCW.. force the maint script to REREAD the config from cachedir
+	$configdir = "$cachedir/config";
+	$file = "$configdir/info";
+	$text = read_file( $file ) ||
+		die "maint_init: can't slurp config file $file\n";
+	$configdata = decode_json( $text );
+	#die Dumper $configdata;
 	%config = %$configdata;
 	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
-
-	# DCW.. force the maint script to read config from cachedir
-	$configdir = "$cachedir/config";
 
 	$lsbid = $config{lsbid} || die "maint_init: no config lsbid\n";
 	$lsbrelease = $config{lsbrelease} ||
