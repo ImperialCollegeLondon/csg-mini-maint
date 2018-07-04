@@ -61,15 +61,17 @@ our %permittedprop = map { $_ => 1 }
 sub maint_parseproperties ($)
 {
   my $string = basename($_[0]);
+  print "debug: parseprops: string $string\n";
   my @strparts = split(/\./, $string);
 
   shift @strparts;	# discard the filename
 
   my %props;
-  foreach my $mod (@strparts)
+  foreach my $str (@strparts)
   {
-    my( $key, $value ) = split(/\-/, $mod, 2);
+    my( $key, $value ) = split(/[-=]/, $str, 2);
     $props{$key} = $value if $permittedprop{$key} && defined $value;
+    print "debug: parseprops: found prop $key, value $value\n";
   }
 
   return %props;
