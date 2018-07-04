@@ -78,10 +78,10 @@ sub maint_parseproperties ($)
   return %props;
 }
 
-=head2 B<my %props = maint_getproperties( $distbase, $path )>
+=head2 B<my %props = maint_getproperties( $distbase, $srcpath )>
 
 This takes $distbase, the base of the dist tree, eg. .../dist, and
-$path, the absolute path of a file name in the $distbase, and
+$srcpath, the absolute path of a file name in the $distbase, and
 figures out which properties should apply to that file by reading
 .props files.
 
@@ -92,10 +92,11 @@ the path from $distbase to $path..
 
 sub maint_getproperties ($$)
 {
-	my( $distbase, $path ) = @_;
+	my( $distbase, $srcpath ) = @_;
 
-	maint_info( "Getting properties for chosen file $path" );
+	maint_info( "Getting properties for chosen file $srcpath" );
 
+	my $path = $srcpath;
 	$path =~ s|^$distbase/||;	# remove the distbase prefix..
 	$path = dirname($path);		# remove the hostclass filename suffix
 	maint_info( "Getting properties: chosen path altered to $path" );
@@ -120,8 +121,8 @@ sub maint_getproperties ($$)
 		# and merge %newprops into %props
 		@props{keys %newprops} = values %newprops;
 	}
-	# merge in any properties at the end of the $path, in .key-value.. form
-	my %newprops = maint_parseproperties( $path );
+	# merge in any .key-value.. properties at the end of the $srcpath
+	my %newprops = maint_parseproperties( $srcpath );
 	@props{keys %newprops} = values %newprops;
 
 	# sanitise: remove any unknown properties
