@@ -9,6 +9,7 @@ our %EXPORT_TAGS = (
     'all' => [
         qw(
               maint_choose
+              maint_parseprops
 	      maint_getproperties
           )
     ]
@@ -35,6 +36,7 @@ read the properties that apply to that file.
     use Maint::Choose qw(:all);
 
     maint_choose
+    maint_parseprops
     maint_getproperties
 
 =head1 EXPORT
@@ -45,34 +47,30 @@ None by default, :all will export maint_choose().
 
 =cut
 
-sub _make_choice(@)
+
+=head2 B<my %props = maint_parseprops( $string )>
+
+Parses $string for dotted suffix modifiers (of the form .key-value...)
+and returns a property hash.
+
+=cut
+
+sub maint_parseprops ($)
 {
-    my @orderedfiles = @_;
+  my( $string ) = basename($_[0]);
+  my @strparts = split(/\./, $string);
 
-    # We want to find the first populated member of this list of lists.
-    # It also needs to be a singleton.
-    foreach my $olist (@orderedfiles)
-    {
-	next unless defined $olist;
-	if( @$olist > 1 )
-	{
-	    my $ostr = join(", ", @$olist);
-	    maint_warning( "$ostr are of equal priority, cannot reconcile!");
-	    return undef;
-	}
-	# precisely one candidate, good!
-	my $candidate = $$olist[0];
-	if( -f $candidate && -r $candidate )
-	{
-	    maint_debug( "Matched file: $candidate" );
-	    return $candidate;
-	}
-        maint_warning( "$candidate would match but is not readable!");
-        return undef;
-    }
-    return undef;
+  shift @strparts;	# discard the filename
+
+  my %props;
+  foreach my $mod (@strparts)
+  {
+    my( $key, $value ) = split(/\-/, $mod, 2);
+    $props{$key} = $value;
+  }
+
+  return %props;
 }
-
 
 =head2 B<my %props = maint_getproperties( $distbase, $path )>
 
@@ -101,7 +99,6 @@ sub maint_getproperties ($$)
 
 	my $dir = $distbase;
 	my %props;
-	my @above;
 
 	foreach my $name (split(m|/|,$path) )
 	{
@@ -117,6 +114,10 @@ sub maint_getproperties ($$)
 		# and merge %newprops into %props
 		@props{keys %newprops} = values %newprops;
 	}
+	# find any properties at the end of the $path, in .key-value... form
+	my %newprops = maint_parseprops( $path );
+	# and merge them into %props
+	@props{keys %newprops} = values %newprops;
 
 	return %props;
 }
@@ -157,12 +158,14 @@ sub maint_choose ($$)
     {
         my $classfile = "$distbase/$under/$class";
 	my @g = glob("$classfile.*");
+	push @g, $classfile if -f $classfile;
 	maint_fatalerror( "found $classfile.* classfiles @g" )
-		if @g > 0;
+		if @g > 1;
 
-	next unless -f $classfile;
-	my %props = maint_getproperties( $distbase, $classfile );
-	return ( "$under/$class", \%props );
+	next unless @g==1;
+	my %props = maint_getproperties( $distbase, $g[0] );
+	$g[0] =~ s|^$distbase/||;
+	return ( $g[0], \%props );
     }
     return ( undef, undef );
 }
