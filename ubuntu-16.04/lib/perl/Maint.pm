@@ -92,6 +92,7 @@ group from each included module.
 =cut
 
 our $configdir;			# where the config lives
+our $cachedir;			# where to store local src eg /var/cache/minimaint
 our %config;			# the config hash
 our $lsbid;			# which distro (eg Ubuntu)
 our $lsbrelease;		# which release of Ubuntu (eg 16.04)
@@ -108,14 +109,18 @@ sub loadconfig()
 	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
 	my $file = "$configdir/info";
 	my $text = read_file( $file ) ||
-		die "minimaint: can't slurp config file $file\n";
+		die "maint_init: can't slurp config file $file\n";
 	my $configdata = decode_json( $text );
 	#die Dumper $configdata;
 	%config = %$configdata;
+	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 
-	$lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
+	# DCW.. force the maint script to read config from cachedir
+	$configdir = "$cachedir/config";
+
+	$lsbid = $config{lsbid} || die "maint_init: no config lsbid\n";
 	$lsbrelease = $config{lsbrelease} ||
-		die "minimaint: no config lsbrelease\n";
+		die "maint_init: no config lsbrelease\n";
 	$distribution = lc("$lsbid-$lsbrelease");
 	my $maintroot = "$config{cachedir}/$distribution";
 	$config{maintroot} = $maintroot;
