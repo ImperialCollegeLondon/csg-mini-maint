@@ -414,14 +414,13 @@ sub _class_setup ($)
 
 sub _classes_from_file
 {
-	my @classes;
-	my $infh;
-        unless( open( $infh, '<', $hostclassfile ) )
+        unless( open( my $infh, '<', $hostclassfile ) )
         {
             maint_log(LOG_DEBUG, "Cannot open class cache file: $hostclassfile" );
             return ();
         }
     
+	my @classes;
 	while( <$infh> )
 	{
 		chomp;
@@ -430,7 +429,7 @@ sub _classes_from_file
 		push @classes, $_;
 	}
         close( $infh );
-	maint_warning( "classes_from_file: classes are <<@classes>>" );
+	maint_warning( "classes_from_file(file $hostclassfile): classes are <<@classes>>" );
         return @classes;
 }
 
