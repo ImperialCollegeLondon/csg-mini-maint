@@ -99,7 +99,10 @@ foreach my $srcdir (@distfiles)
 	my $destdir = dirname( $srcfilename );
 	my $destfile = "$destroot$destdir";
 
-	maint_debug( "chosen file $srcfilename, props=$showprops, dest $destfile" );
+	if( $path =~ /nginx/ )
+	{
+		maint_warning( "chosen file $srcfilename, props=$showprops, dest $destfile" );
+	}
 
 	# abs path now for file testing
 	$srcfilename = "$distbase$srcfilename";
