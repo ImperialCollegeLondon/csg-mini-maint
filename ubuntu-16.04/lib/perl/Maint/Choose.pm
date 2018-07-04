@@ -61,7 +61,7 @@ our %permittedprop = map { $_ => 1 }
 sub maint_parseproperties ($)
 {
   my $string = basename($_[0]);
-  print "debug: parseprops: string $string\n";
+  maint_info( "parseprops: string $string" );
   my @strparts = split(/\./, $string);
 
   shift @strparts;	# discard the filename
@@ -71,7 +71,7 @@ sub maint_parseproperties ($)
   {
     my( $key, $value ) = split(/[-=]/, $str, 2);
     $props{$key} = $value if $permittedprop{$key} && defined $value;
-    print "debug: parseprops: found prop $key, value $value\n";
+    maint_info( " parseprops: found prop $key, value $value" );
   }
 
   return %props;
@@ -93,11 +93,11 @@ sub maint_getproperties ($$)
 {
 	my( $distbase, $path ) = @_;
 
-	maint_debug( "Getting properties for chosen file $path" );
+	maint_info( "Getting properties for chosen file $path" );
 
 	$path =~ s|^$distbase/||;	# remove the distbase prefix..
 	$path = dirname($path);		# remove the hostclass filename suffix
-	maint_debug( "Getting properties: chosen path altered to $path" );
+	maint_info( "Getting properties: chosen path altered to $path" );
 
 	-d $distbase ||
 		maint_fatalerror( "getproperties: no such distbase $distbase" );
@@ -169,10 +169,9 @@ sub maint_choose ($$)
         my $classfile = "$distbase/$under/$class";
 	my @g = glob("$classfile.*");
 	push @g, $classfile if -f $classfile;
-	maint_fatalerror( "found $classfile.* classfiles @g" )
-		if @g > 1;
+	maint_fatalerror( "found $classfile.* classfiles @g" ) if @g > 1;
 
-	next unless @g==1;
+	next if @g==0;
 	my %props = maint_getproperties( $distbase, $g[0] );
 	$g[0] =~ s|^$distbase/||;
 	return ( $g[0], \%props );
