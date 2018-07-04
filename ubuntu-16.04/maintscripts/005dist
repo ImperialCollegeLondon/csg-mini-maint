@@ -54,7 +54,6 @@ use File::Find;
 use File::Spec;
 use File::Path;
 use Maint qw(:all);
-#use Maint::Run;
 use Cwd qw(abs_path getcwd);
 use Data::Dumper;
 
@@ -349,7 +348,7 @@ sub makesymlink
 	# Invoke 'readlink -m -n' to make sure $abs_slink is canonical, even if
 	# path components do not (yet) exist.
 
-	runcmd(['/bin/readlink', '-m', '-n', "$abs_slink"],
+	maint_runcmd(['/bin/readlink', '-m', '-n', "$abs_slink"],
 		undef, 1, undef, \$abs_slink, \*STDERR);
 	maint_warning( "[$abs_slink] does not exist for symlink [$destfile], ".
 		       "but symlinking to it anyway" )

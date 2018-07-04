@@ -94,12 +94,12 @@ sub maint_getproperties ($$)
 {
 	my( $distbase, $srcpath ) = @_;
 
-	maint_info( "Getting properties for chosen file $srcpath" );
+	maint_debug( "Getting properties for chosen file $srcpath" );
 
 	my $path = $srcpath;
 	$path =~ s|^$distbase/||;	# remove the distbase prefix..
 	$path = dirname($path);		# remove the hostclass filename suffix
-	maint_info( "Getting properties: chosen path altered to $path" );
+	maint_debug( "Getting properties: chosen path altered to $path" );
 
 	-d $distbase ||
 		maint_fatalerror( "getproperties: no such distbase $distbase" );
