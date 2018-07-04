@@ -9,7 +9,7 @@ our %EXPORT_TAGS = (
     'all' => [
         qw(
               maint_choose
-              maint_parseprops
+              maint_parseproperties
 	      maint_getproperties
           )
     ]
@@ -36,7 +36,7 @@ read the properties that apply to that file.
     use Maint::Choose qw(:all);
 
     maint_choose
-    maint_parseprops
+    maint_parseproperties
     maint_getproperties
 
 =head1 EXPORT
@@ -48,16 +48,18 @@ None by default, :all will export maint_choose().
 =cut
 
 
-=head2 B<my %props = maint_parseprops( $string )>
+=head2 B<my %props = maint_parseproperties( $string )>
 
 Parses $string for dotted suffix modifiers (of the form .key-value...)
 and returns a property hash.
 
 =cut
 
-sub maint_parseprops ($)
+sub maint_parseproperties ($)
 {
-  my( $string ) = basename($_[0]);
+  my $string = basename($_[0]);
+  die "debug: maint_pp: input $_[0], string $string\n";
+
   my @strparts = split(/\./, $string);
 
   shift @strparts;	# discard the filename
@@ -115,7 +117,7 @@ sub maint_getproperties ($$)
 		@props{keys %newprops} = values %newprops;
 	}
 	# find any properties at the end of the $path, in .key-value... form
-	my %newprops = maint_parseprops( $path );
+	my %newprops = maint_parseproperties( $path );
 	# and merge them into %props
 	@props{keys %newprops} = values %newprops;
 
