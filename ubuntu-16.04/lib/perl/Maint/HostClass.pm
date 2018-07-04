@@ -405,7 +405,7 @@ sub _class_setup ($)
         }
 	foreach (@$linear) 
         { 
-            print $fd "$_\n" if $_;	# DCW why the blank test?
+            print $fd "$_\n";
         }
 	unless( maint_safeclose($handle) )
         {
