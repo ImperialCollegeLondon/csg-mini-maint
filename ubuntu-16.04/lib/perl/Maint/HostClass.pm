@@ -414,7 +414,7 @@ sub _class_setup ($)
 
 sub _classes_from_file
 {
-	my @classes = ();
+	my @classes;
 	my $infh;
         unless( open( $infh, '<', $hostclassfile ) )
         {
@@ -430,6 +430,7 @@ sub _classes_from_file
 		push @classes, $_;
 	}
         close( $infh );
+	maint_warning( "classes_from_file: classes are <<@classes>>" );
         return @classes;
 }
 
