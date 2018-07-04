@@ -359,7 +359,7 @@ sub maint_log ($$)
 	elsif( $tracemode eq 'c' || $level == LOG_DEBUG || $level == LOG_ERR )
 	{
 		my( undef, $filename, $lineno, undef ) = caller(0);
-		my( undef, undef, undef, $subroutine ) = caller(1);
+		my( undef, undef, undef, $subroutine ) = caller(2);
 		$subroutine = 'Sub???' unless defined $subroutine;
 		my( $sub ) = ($subroutine =~ m/([^:]+)$/);
 		my( $file ) = ($filename =~ m#^(?:\.\./)*(?:lib/perl/)?(.*)$#);
