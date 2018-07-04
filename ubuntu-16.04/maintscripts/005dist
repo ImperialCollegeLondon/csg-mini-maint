@@ -286,7 +286,7 @@ sub deletefile
 {
 	my( $dest ) = @_;
 
-	maint_warning( "Would delete file $dest" ); return;
+	#maint_warning( "Would delete file $dest" ); return;
 
 	unless( -e $dest || -l $dest )
 	{
