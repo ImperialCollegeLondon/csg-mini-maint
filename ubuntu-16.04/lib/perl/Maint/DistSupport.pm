@@ -64,7 +64,7 @@ Note that if a host is NEITHER spock nor in the 'SERVER' hostclass, it's
 
 =head1 EXPORT
 
-None by default, :all will export maint_distchoose().
+None by default, :all will export all the above 3.
 
 =head1 FUNCTIONS
 
@@ -105,7 +105,7 @@ sub trav_dir ($$$)
 	my $myprops = $parentprops;
 	if( -f $propfile )
 	{
-		print "debug: found $propfile\n";
+		maint_debug( "found $propfile" );
 		# form a new %props hash containing the inherited
 		# parental properties overlaid with the new properties
 		$myprops = { %$parentprops };
@@ -146,7 +146,7 @@ sub trav_dir ($$$)
 	{
 		push @$result,
 			{
-				PATH  => $dir,
+				PATH  => "/$dir",
 				PROPS => { %$myprops },
 			};
 	}

@@ -145,7 +145,7 @@ sub maint_checkdiskspace($)
 	# available everywhere...
 	unless( eval { local $SIG{__DIE__}; require Filesys::Statvfs;} )
 	{
-		maint_log(LOG_WARNING, "Filesys::Statvfs module not available - freespace check skipped");
+		maint_warning( "Filesys::Statvfs module not available - freespace check skipped");
 		return 1;
 	}
 	import Filesys::Statvfs;
@@ -159,7 +159,7 @@ sub maint_checkdiskspace($)
 			last if -d $path;
 			$path = File::Spec->rootdir();
 		}
-		maint_log(LOG_DEBUG, "$p not a directory or doesn't exist - testing path [$path] instead");
+		maint_debug( "$p not a directory or doesn't exist - testing path [$path] instead");
 	}
 	my( $bsize, $frsize, $blocks, $bfree, $bavail,
 	    $files, $ffree, $favail, $fsid, $basetype, $flag,
@@ -167,15 +167,15 @@ sub maint_checkdiskspace($)
 	my $available = int($bsize * $bavail / 1024 / 1024);
 	if( $available < 50 )
 	{
-		maint_log(LOG_WARNING, "Filesystem which $path is on only has ${available}MB available, less than the required 50MB");
+		maint_warning( "Filesystem which $path is on only has ${available}MB available, less than the required 50MB");
 		return 0;
 	}
 	if( $favail < 50 )
 	{
-		maint_log(LOG_WARNING, "Filesystem which $path is on only has $favail inodes available, less than the required 50");
+		maint_warning( "Filesystem which $path is on only has $favail inodes available, less than the required 50");
 		return 0;
 	}
-	maint_log(LOG_DEBUG, "Filesystem which $path is on has ${available}MB and $favail  inodes available - OK");
+	maint_debug( "Filesystem which $path is on has ${available}MB and $favail  inodes available - OK");
 	return 1;
 }
 
@@ -210,18 +210,18 @@ sub _is_special($)
 sub _checkandmakedir($)
 {
 	my $dir = shift;
-	maint_log(LOG_ERR, "_checkandmakedir() must have a directory as parameter") unless defined $dir;
-	maint_log(LOG_DEBUG, "Checking directory exists: $dir");
+	maint_fatalerror( "_checkandmakedir() must have a directory as parameter") unless defined $dir;
+	maint_debug( "Checking directory exists: $dir");
 	return if -d $dir;
 	if (-e $dir)
 	{
-		maint_log(LOG_ERR, "Cannot make directory $dir, something with that name exists already");
+		maint_fatalerror( "Cannot make directory $dir, something with that name exists already");
 	}
-	maint_log(LOG_DEBUG, "Making directory $dir");
+	maint_debug( "Making directory $dir");
 	eval { mkpath([$dir], 0, 0755) };
 	if ($@)
 	{
-		maint_log(LOG_ERR, "Cannot create dir $dir");
+		maint_fatalerror( "Cannot create dir $dir");
 	}
 }
 
@@ -261,19 +261,19 @@ sub maint_safeopen ($;$$$$)
 	$h->{filename} = $filename;
 	unless( $h->{filename} )
 	{
-		maint_log(LOG_WARNING, "maint_safeopen, zero length filename invalid");
+		maint_warning( "maint_safeopen, zero length filename invalid");
 		return (undef, undef);
 	}
 
 	# Space check
 	
-	maint_log(LOG_ERR, "Insufficient space left to open $h->{filename}")
+	maint_fatalerror( "Insufficient space left to open $h->{filename}")
 		unless maint_checkdiskspace($h->{filename});
 
 	# Sanity check - we only replace files or symlinks
 	if( -e $h->{filename} && !(-l $h->{filename} || -f $h->{filename}) )
 	{
-		maint_log(LOG_WARNING, "Cannot open $h->{filename} as it's not a file or symlink");
+		maint_warning( "Cannot open $h->{filename} as it's not a file or symlink");
 		return (undef, undef);
 	}
 
@@ -286,7 +286,7 @@ sub maint_safeopen ($;$$$$)
 			my $s;
 			unless( $s = File::stat::stat($h->{filename}) )
 			{
-				maint_log(LOG_WARNING, "Cannot stat $h->{filename}");
+				maint_warning( "Cannot stat $h->{filename}");
 				return (undef, undef);
 			}
 			$mode //= $s->mode();
@@ -305,30 +305,30 @@ sub maint_safeopen ($;$$$$)
 	$h->{gid}      = $gid;
 	$h->{nobackup} = $nobackup;
 	$h->{tmpname}  = $h->{filename} . $newfile_suffix;
-	maint_log(LOG_DEBUG, "Opening $h->{filename} as $h->{tmpname}");
+	maint_debug( "Opening $h->{filename} as $h->{tmpname}");
 
 	if( -e $h->{tmpname} )    # Stale or maybe from another parallel
 	                         # running process (which shouldn't happen)
 	{
 		unless( unlink($h->{tmpname}) )
 		{
-			maint_log(LOG_WARNING, "Cannot unlink [$h->{tmpname}]");
+			maint_warning( "Cannot unlink [$h->{tmpname}]");
 			return (undef, undef);
 		}
 	}
 	unless( sysopen(FD, $h->{tmpname}, O_RDWR | O_EXCL | O_CREAT | O_NOFOLLOW | O_SYNC, $mode) )
 	{
-		maint_log(LOG_WARNING, "Safefile open failed for [$h->{filename}]: $!");
+		maint_warning( "Safefile open failed for [$h->{filename}]: $!");
 		return (undef, undef);
 	}
 	$h->{fd} = *FD;
-	maint_log(LOG_DEBUG, sprintf "Setting tmp new file owner=%d.%d, mode=%o", $h->{uid}, $h->{gid}, $h->{mode});
+	maint_debug( sprintf "Setting tmp new file owner=%d.%d, mode=%o", $h->{uid}, $h->{gid}, $h->{mode});
 	chmod( $h->{mode}, $h->{tmpname} ) ||
-		maint_log(LOG_WARNING, "Cannot chmod $h->{tmpname} - $!");
+		maint_warning( "Cannot chmod $h->{tmpname} - $!");
 	if( $> == 0 )
 	{
 		chown( $h->{uid}, $h->{gid}, $h->{tmpname} ) ||
-			maint_log(LOG_WARNING, "Cannot chown $h->{tmpname} - $!");
+			maint_warning( "Cannot chown $h->{tmpname} - $!");
 	}
 	return (*FD, $h);
 }
@@ -350,7 +350,7 @@ sub maint_safeclose ($)
 	close($h->{fd});
 	my $update_file = 0;
 
-	maint_log(LOG_ERR, "Insufficient space left to open $h->{filename}")
+	maint_fatalerror( "Insufficient space left to open $h->{filename}")
 		unless maint_checkdiskspace($h->{filename});
 
 	# Sanity checks
@@ -358,27 +358,27 @@ sub maint_safeclose ($)
 	{
 		# Very very bad - one or both of the filenames is zero length
 		# Time to bomb - something very odd here
-		maint_log(LOG_ERR, "The temp filename or the current filename are zero length");
+		maint_fatalerror( "The temp filename or the current filename are zero length");
 		return 0;
 	}
 	unless( -f $h->{tmpname} )
 	{
 		# This is very bad... Let's bomb now
-		maint_log(LOG_ERR, "Cannot find temp file $h->{tmpname}");
+		maint_fatalerror( "Cannot find temp file $h->{tmpname}");
 		return 0;
 	}
 
 	my $oldfile = $h->{filename} . $oldfile_suffix;
 
 	# Do we switch the temp file in place?
-	maint_log(LOG_WARNING, "[$h->{filename}] has a -special lockout") if
+	maint_warning( "[$h->{filename}] has a -special lockout") if
 		_is_special($h->{filename});
 	unless( maint_safedryrun() || _is_special($h->{filename}) )
 	{
 		unless( -e $h->{filename} )
 		{
 			# New file, don't need to compare anything
-			maint_log(LOG_INFO, "Writing new $h->{filename}");
+			maint_info( "Writing new $h->{filename}");
 			$update_file = 1;
 		}
 		else
@@ -386,12 +386,12 @@ sub maint_safeclose ($)
 			# We do have both files, cmp them
 			if( compare($h->{tmpname}, $h->{filename}) != 0 )
 			{
-				maint_log(LOG_INFO, "Updating $h->{filename}");
+				maint_info( "Updating $h->{filename}");
 				$update_file = 1;
 			}
 			else
 			{
-				maint_log(LOG_DEBUG, "Unchanged $h->{filename}");
+				maint_debug( "Unchanged $h->{filename}");
 				$update_file = 0;
 			}
 		}
@@ -403,7 +403,7 @@ sub maint_safeclose ($)
 				{
 					unless( unlink( $oldfile ) )
 					{
-						maint_log(LOG_WARNING, "Cannot unlink old backup $oldfile");
+						maint_warning( "Cannot unlink old backup $oldfile");
 						return 0;
 					}
 				}
@@ -411,22 +411,22 @@ sub maint_safeclose ($)
 				{
 					unless( link($h->{filename}, $oldfile))
 					{
-						maint_log(LOG_WARNING, "Cannot make backup of $h->{filename}");
+						maint_warning( "Cannot make backup of $h->{filename}");
 						return 0;
 					}
-					maint_log(LOG_DEBUG, "Making a backup from $h->{filename} to $oldfile");
+					maint_debug( "Making a backup from $h->{filename} to $oldfile");
 				}
 				else
 				{
-					maint_log(LOG_DEBUG, "Asked to not make a backup");
+					maint_debug( "Asked to not make a backup");
 				}
 			}
-			maint_log(LOG_DEBUG, "Renaming $h->{tmpname} to $h->{filename}");
+			maint_debug( "Renaming $h->{tmpname} to $h->{filename}");
 
 			# Now switch the new temp file over the current one
 			unless( rename($h->{tmpname}, $h->{filename}) )
 			{
-				maint_log(LOG_WARNING, "Cannot replace $h->{filename} with new temp version");
+				maint_warning( "Cannot replace $h->{filename} with new temp version");
 				return 0;
 			}
 			# Note for checking against triggers later.
@@ -436,36 +436,36 @@ sub maint_safeclose ($)
 		{
 			if( compare($h->{tmpname}, $h->{filename}) == 0 )
 			{
-				maint_log(LOG_DEBUG, "Unchanged $h->{filename}");
+				maint_debug( "Unchanged $h->{filename}");
 				if( unlink($h->{tmpname}) )
 				{
-					maint_log(LOG_DEBUG, "unlinked $h->{tmpname}");
+					maint_debug( "unlinked $h->{tmpname}");
 				}
 				else
 				{
-					maint_log(LOG_WARNING, "Error unlinking $h->{tmpname}");
+					maint_warning( "Error unlinking $h->{tmpname}");
 				}
 			}
 		}
 		# Remove any existing backups
 		if( $h->{nobackup} && -e $oldfile )
 		{
-			maint_log(LOG_INFO, "Deleting $oldfile as we don't want backups");
+			maint_info( "Deleting $oldfile as we don't want backups");
 			unless( unlink( $oldfile ) )
 			{
-				maint_log(LOG_WARNING, "Cannot unlink old backup $oldfile");
+				maint_warning( "Cannot unlink old backup $oldfile");
 			}
 		}
 
 		# We'll carry on and fix the modes and ownership regardless
 		my $setmsg = sprintf( "Setting file owner=%d.%d, mode=%o", $h->{uid}, $h->{gid}, $h->{mode});
-		maint_log(LOG_DEBUG, $setmsg );
+		maint_debug( $setmsg );
 		chmod( $h->{mode}, $h->{filename} ) ||
-			maint_log(LOG_WARNING, "Cannot chmod $h->{filename} - $!");
+			maint_warning( "Cannot chmod $h->{filename} - $!");
 		if( $> == 0 )
 		{
 			chown($h->{uid}, $h->{gid}, $h->{filename}) ||
-				maint_log(LOG_WARNING,
+				maint_warning(
 					"Cannot chown $h->{filename} - $!");
 		}
 	}
@@ -493,21 +493,21 @@ sub maint_safeabort ($)
 	{
 		# Very very bad - one or both of the filenames is zero length
 		# Time to bomb - something very odd here
-		maint_log(LOG_ERR, "The temp filename or the current filename are zero length");
+		maint_fatalerror( "The temp filename or the current filename are zero length");
 		return 0;
 	}
 	unless( -f $h->{tmpname} )
 	{
 		# This is very bad... Let's bomb now
-		maint_log(LOG_ERR, "Cannot find temp file $h->{tmpname}");
+		maint_fatalerror( "Cannot find temp file $h->{tmpname}");
 		return 0;
 	}
 	unless( unlink($h->{tmpname}) )
 	{
-		maint_log(LOG_ERR, "Cannot unlink tmp new file: $h->{tmpname}");
+		maint_fatalerror( "Cannot unlink tmp new file: $h->{tmpname}");
 		return 0;
 	}
-	maint_log(LOG_DEBUG, "Aborted file write to $h->{filename}, file untouched");
+	maint_debug( "Aborted file write to $h->{filename}, file untouched");
 	return 1;
 }
 
@@ -530,22 +530,22 @@ sub maint_safelink ($$;$)
 	# Sanity checks
 	unless( $src )
 	{
-		maint_log(LOG_WARNING, "maint_safelink, zero length source filename invalid");
+		maint_warning( "maint_safelink, zero length source filename invalid");
 		return 0;
 	}
 	unless( $dest )
 	{
-		maint_log(LOG_WARNING, "maint_safelink, zero length destination filename invalid");
+		maint_warning( "maint_safelink, zero length destination filename invalid");
 		return 0;
 	}
-	maint_log(LOG_ERR, "Insufficient space left to link to $dest") unless maint_checkdiskspace($dest);
+	maint_fatalerror( "Insufficient space left to link to $dest") unless maint_checkdiskspace($dest);
 
 	$nobackup = 0 unless defined $nobackup;
 	
 	# Sanity check - we only replace files or symlinks
 	if( -e $dest && !(-l $dest || -f $dest) )
 	{
-		maint_log(LOG_WARNING, "Will not replace $src as it's not a file or symlink");
+		maint_warning( "Will not replace $src as it's not a file or symlink");
 		return 0;
 	}
 	my $symname = $dest . $newfile_suffix;
@@ -554,16 +554,16 @@ sub maint_safelink ($$;$)
 	{
 		unless( unlink $symname )
 		{
-			maint_log(LOG_WARNING, "Cannot unlink old backup $symname");
+			maint_warning( "Cannot unlink old backup $symname");
 			return 0;
 		}
 	}
 	unless( symlink($src, $symname) )
 	{
-		maint_log(LOG_WARNING, "Failed to symlink $src to new temp - $!");
+		maint_warning( "Failed to symlink $src to new temp - $!");
 		return 0;
 	}
-	maint_log(LOG_WARNING, "[$dest] has a -special lockout") if _is_special($dest);
+	maint_warning( "[$dest] has a -special lockout") if _is_special($dest);
 	unless( maint_safedryrun() || _is_special($dest) )
 	{
 		# Check the content of the new and current symplink to see if we really have to switch them
@@ -576,7 +576,7 @@ sub maint_safelink ($$;$)
 				{
 					unless( unlink $olddest )
 					{
-						maint_log(LOG_WARNING, "Cannot unlink old backup $olddest ");
+						maint_warning( "Cannot unlink old backup $olddest ");
 						return 0;
 					}
 				}
@@ -586,7 +586,7 @@ sub maint_safelink ($$;$)
 					{
 						unless( symlink(readlink($dest), $olddest ) )
 						{
-							maint_log(LOG_WARNING, "Failed to backup link $src - $!");
+							maint_warning( "Failed to backup link $src - $!");
 							return 0;
 						}
 					}
@@ -594,7 +594,7 @@ sub maint_safelink ($$;$)
 					{
 						unless( _copyfile($dest, $olddest ) )
 						{
-							maint_log(LOG_WARNING, "Failed to backup file $src - $!");
+							maint_warning( "Failed to backup file $src - $!");
 							return 0;
 						}
 					}
@@ -603,10 +603,10 @@ sub maint_safelink ($$;$)
 
 			unless( rename($symname, $dest) )
 			{
-				maint_log(LOG_WARNING, "Failed to rename symlink $src to $dest - $!");
+				maint_warning( "Failed to rename symlink $src to $dest - $!");
 				return 0;
 			}
-			maint_log(LOG_INFO, "Made symlink $dest pointing at $src");
+			maint_info( "Made symlink $dest pointing at $src");
 			# Note for checking against triggers later.
 			push @files_renamed_list, $dest;
 		}
@@ -617,7 +617,7 @@ sub maint_safelink ($$;$)
 			{
 				unless( unlink $symname )
 				{
-					maint_log(LOG_WARNING, "Cannot unlink old backup $symname");
+					maint_warning( "Cannot unlink old backup $symname");
 					return 0;
 				}
 			}
@@ -660,23 +660,23 @@ sub maint_tmpdirname ()
 		# Fix modes of the tmp dirs
 		unless (-d $tmppath)
 		{
-			maint_log(LOG_WARNING, "Making $tmppath - should be here already");
+			maint_warning( "Making $tmppath - should be here already");
 			mkdir($tmppath) ||
-				maint_log(LOG_ERR, "Failed to create $tmppath: $!");
+				maint_fatalerror( "Failed to create $tmppath: $!");
 		}
 		if( $> == 0 )
 		{
 			chown(0, 0, $tmppath) ||
-				maint_log(LOG_ERR,
+				maint_fatalerror(
 				  "Failed to set owner/gid of $tmppath: $!");
 		}
 		chmod($path->{mode}, $tmppath) ||
-			maint_log(LOG_ERR, "Failed to set mode $tmppath: $!");
+			maint_fatalerror( "Failed to set mode $tmppath: $!");
 	}
 
 	$tmpdirname = tempdir($prefix . '_XXXXXX', DIR => maint_mkrootpath('tmp', 'root'), CLEANUP => 1);
 
-	maint_log(LOG_ERR, "Insufficient space left to make $tmpdirname") unless maint_checkdiskspace($tmpdirname);
+	maint_fatalerror( "Insufficient space left to make $tmpdirname") unless maint_checkdiskspace($tmpdirname);
 	return $tmpdirname;
 }
 
@@ -711,12 +711,12 @@ sub maint_tmpfile (;$)
 				SUFFIX => '.tmp',
 				UNLINK => 0,
 				DIR => maint_tmpdirname());
-	maint_log(LOG_DEBUG, "Opened temp file: $file");
+	maint_debug( "Opened temp file: $file");
 
 	# Now fix the file handle so that is doesn't get closed when spawning subprocesses
 	unless( fcntl($fh, F_SETFD, 0) )
 	{
-		maint_log(LOG_ERR, "Cannot clear close-on-exec flag on temp fh: $!");
+		maint_fatalerror( "Cannot clear close-on-exec flag on temp fh: $!");
 	}
 	return ($fh, $file);
 }
@@ -727,17 +727,17 @@ sub _copyfile
 {
 	my( $src, $dest, $mode ) = @_;
 	local *SRC_FD;
-	maint_log(LOG_DEBUG, "Copy src: $src, dest: $dest");
+	maint_debug( "Copy src: $src, dest: $dest");
 	unless( -f $src || -l $src )
 	{
-		maint_log(LOG_WARNING, "Cannot copy $src to $dest, source file is not a file or a symlink");
+		maint_warning( "Cannot copy $src to $dest, source file is not a file or a symlink");
 		return 0;
 	}
 	if( -e $dest )
 	{
 		unless( unlink($dest) )
 		{
-			maint_log(LOG_WARNING, "Cannot unlink $dest");
+			maint_warning( "Cannot unlink $dest");
 			return 0;
 		}
 	}
@@ -746,25 +746,25 @@ sub _copyfile
 		my $m = File::stat::stat($src);
 		unless( $m )
 		{
-			maint_log(LOG_WARNING, "Cannot stat file $src");
+			maint_warning( "Cannot stat file $src");
 			return 0;
 		}
 		$mode = $m->mode() & 0x1fff;
 	}
 	unless( sysopen(SRC_FD, $src, O_RDONLY, $mode) )
 	{
-		maint_log(LOG_WARNING, "Cannot open $src for reading - skipping copy - $!");
+		maint_warning( "Cannot open $src for reading - skipping copy - $!");
 		return 0;
 	}
 	unless( sysopen(DEST_FD, $dest, O_RDWR | O_EXCL | O_CREAT | O_NOFOLLOW | O_SYNC, $mode) )
 	{
-		maint_log(LOG_WARNING, "Cannot open $dest for writing - skipping copy - $!");
+		maint_warning( "Cannot open $dest for writing - skipping copy - $!");
 		close(SRC_FD);
 		return 0;
 	}
 	unless( _copyfd(*SRC_FD, *DEST_FD) )
 	{
-		maint_log(LOG_WARNING, "Failed to copy data from $src to $dest");
+		maint_warning( "Failed to copy data from $src to $dest");
 		close SRC_FD;
 		close DEST_FD;
 		return 0;
@@ -797,27 +797,27 @@ sub maint_safecopy
 {
 	my( $src, $dest, $mode, $uid, $gid, $nobackup ) = @_;
 	local *SRC_FD;
-	maint_log(LOG_DEBUG, "Copy src: $src, dest: $dest");
+	maint_debug( "Copy src: $src, dest: $dest");
 	unless( -f $src )
 	{
-		maint_log(LOG_WARNING, "maint_safecopy: src=$src does not exist");
+		maint_warning( "maint_safecopy: src=$src does not exist");
 		return 0;
 	}
 	unless( open(SRC_FD, '<', $src) )
 	{
-		maint_log(LOG_WARNING, "maint_safecopy: cannot open $src for reading");
+		maint_warning( "maint_safecopy: cannot open $src for reading");
 		return 0;
 	}
 	my( $dest_fd, $handle ) = maint_safeopen( $dest, $mode, $uid, $gid, $nobackup );
 	unless( defined $dest_fd )
 	{
-		maint_log(LOG_WARNING, "maint_safecopy: cannot open $dest for writing");
+		maint_warning( "maint_safecopy: cannot open $dest for writing");
 		close SRC_FD;
 		return 0;
 	}
 	unless( _copyfd(*SRC_FD, $dest_fd) )
 	{
-		maint_log(LOG_WARNING, "Cannot copy $src to $dest");
+		maint_warning( "Cannot copy $src to $dest");
 		close SRC_FD;
 		maint_safeabort($handle);
 		return 0;
@@ -837,7 +837,7 @@ sub _copyfd ($$)
 		$n = sysread($src_fd, $data, 1024 * 1024);
 		unless( defined $n )
 		{
-			maint_log(LOG_WARNING, "Failed to read from file");
+			maint_warning( "Failed to read from file");
 			return 0;
 		}
 		if( $n > 0 )
@@ -845,18 +845,18 @@ sub _copyfd ($$)
 			my $res = syswrite $dest_fd, $data;
 			unless( defined $res )
 			{
-				maint_log(LOG_WARNING, "Failed to write to file");
+				maint_warning( "Failed to write to file");
 				return 0;
 			}
 			if( $res != length($data) )
 			{
-				maint_log(LOG_WARNING, "Failed to write the number of bytes we asked for");
+				maint_warning( "Failed to write the number of bytes we asked for");
 				return 0;
 			}
 		}
 		if( $n == 0 )
 		{
-			maint_log(LOG_DEBUG, "_maint_safecopyfd OK");
+			maint_debug( "_maint_safecopyfd OK");
 			return 1;
 		}
 	}
@@ -881,7 +881,7 @@ sub maint_saferuntriggers
 	unless( defined $safetriggerfile && $safetriggerfile &&
 		-f $safetriggerfile )
 	{
-		maint_log(LOG_WARNING, "No triggers file specified");
+		maint_warning( "No triggers file specified");
 		return 0;
 	}
 
@@ -889,7 +889,7 @@ sub maint_saferuntriggers
 	my $json = decode_json( $triggerdata );
 
 	my %files_renamed = map { $_ => 1 } @files_renamed_list;
-	maint_log(LOG_INFO, "Checking file triggers");
+	maint_info( "Checking file triggers");
 	my @actions     = ();
 	foreach my $pair (@$json)
 	{
@@ -897,7 +897,7 @@ sub maint_saferuntriggers
 		my $action = $pair->{action};
 		if( exists $files_renamed{$testforfile} )
 		{
-			maint_log(LOG_DEBUG, "Noted trigger on file $testforfile");
+			maint_debug( "Noted trigger on file $testforfile");
 			push @actions, $action;
 		}
 	}
@@ -907,11 +907,11 @@ sub maint_saferuntriggers
 		next if $actionsdone{$act}++;
 		if( maint_safedryrun() )
 		{
-			maint_log(LOG_INFO, "dry_run set: would have run trigger: $act");
+			maint_info( "dry_run set: would have run trigger: $act");
 			next;
 		}
-		maint_log(LOG_WARNING, "Would run trigger: $act");
-		#maint_log(LOG_DEBUG, "Running trigger: $act");
+		maint_warning( "Would run trigger: $act");
+		#maint_debug( "Running trigger: $act");
 		#DCWmaint_runcmd([split(/\s+/, $act)], undef, 1); # We only have a string...
 	}
 	return 1;
@@ -921,7 +921,7 @@ sub maint_saferuntriggers
 =head2 B<maint_safeprint( $filehandle, $text)>
 
 Same as print, except write errors will abort with maint_safeabort() and
-maint_log(LOG_ERR, )
+maint_fatalerror( )
 
 =cut
 
@@ -933,7 +933,7 @@ sub maint_safeprint
 	{
 		my $oserr = $!;
 		maint_safeabort($handle);
-		maint_log(LOG_ERR, "Error writing to file $handle->{filename}");
+		maint_fatalerror( "Error writing to file $handle->{filename}");
 	}
 }
 
@@ -951,45 +951,45 @@ Returns 1 on success, 0 on failure
 sub maint_safedelete
 {
 	my( $dest ) = @_;
-	maint_log(LOG_DEBUG, "Considering deleting dest: $dest");
+	maint_debug( "Considering deleting dest: $dest");
 
 	unless( -e $dest || -l $dest )
 	{
-		maint_log(LOG_INFO, "$dest does not exist, nothing to remove");
+		maint_info( "$dest does not exist, nothing to remove");
 		return 0;
 	}
 
 	if( maint_safedryrun() )
 	{
-		maint_log(LOG_INFO, "Want to remove $dest, but we are in dryrun mode");
+		maint_info( "Want to remove $dest, but we are in dryrun mode");
 		return 1;
 	}
 	
 	if( _is_special($dest) )
 	{
-		maint_log(LOG_WARNING, "Want to remove $dest, but is either protected by $dest-special");
+		maint_warning( "Want to remove $dest, but is either protected by $dest-special");
 		return 1;
 	}
 	
 	if( -d $dest )
 	{
-		maint_log(LOG_INFO, "removing directory $dest");
+		#maint_info( "Removing directory $dest");
 		if( ! rmdir($dest) )
 		{
-			maint_log(LOG_WARNING, "Failed to remove directory $dest: $!");
+			maint_warning( "Failed to remove directory $dest: $!");
 			return 0;
 		}
-		maint_log(LOG_INFO, "Removed directory $dest");
+		maint_info( "Removed directory $dest");
 	}
 	else 
 	{
-		maint_log(LOG_INFO, "removing non-directory $dest");
+		#maint_info( "Removing non-directory $dest");
 		if( ! unlink($dest) )
 		{
-			maint_log(LOG_WARNING, "Failed to remove file/node $dest: $!");
+			maint_warning( "Failed to remove file $dest: $!");
 			return 0;
 		}		
-		maint_log(LOG_INFO, "Removed file/node $dest");
+		maint_info( "Removed file $dest");
 	}
 
 	return 1;

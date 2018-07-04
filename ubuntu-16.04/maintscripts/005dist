@@ -50,15 +50,13 @@ use strict;
 use warnings;
 
 use File::Basename;
-use File::Find;
-use File::Spec;
+#use File::Spec;
 use File::Path;
-use Maint qw(:all);
-use Cwd qw(abs_path getcwd);
+use Cwd qw(getcwd);
 use Data::Dumper;
 
+use Maint qw(:all);
 
-sub get_dist_list ($);
 
 # Main code
 
@@ -69,45 +67,67 @@ maint_usage() unless @ARGV == 0;
 my $confdir = maint_getconfigdir();
 my $distbase = "$confdir/dist";
 maint_fatalerror( "No dist base $distbase!" ) unless -d $distbase;
+
 my $destroot = maint_getconfig( "dist:root" ) // "/";
 mkpath( [$destroot], 0, 0755 ) unless -d $destroot;
 maint_fatalerror( "No dist destination root!" ) unless -d $destroot;
 
-my @distfiles = maint_distpaths( $distbase );
+my @distdata = maint_distpaths( $distbase );
 
-#maint_fatalerror( "distfiles are: ". Dumper( \@distfiles ) );
+#maint_fatalerror( "distdata is: ". Dumper( \@distdata ) );
 
-foreach my $df (@distfiles)
+foreach my $df (@distdata)
 {
 	my $srcdir = $df->{PATH};
 	my $props = $df->{PROPS};
 
 	#print "debug: srcdir=$srcdir\n";
 
-	( my $srcfilename, $props ) =
+	my ( $srcfilename, $newprops ) =
 		maint_distchoose( $distbase, $srcdir, $props );
 
-	unless( defined $srcfilename )
-	{
-		maint_debug( "No candidate for $srcdir, skipping");
-		next;
-	}
-
-	#die "debug: srcfilename:$srcfilename, properties are ". Dumper($props);
+	my $destdir = "$srcdir";
+	my $destfile = "$destroot$destdir";
 
 	my $showprops = join( ',',
 		map { "$_=$props->{$_}" }
 			sort keys %$props );
 
-	$srcfilename = "/$srcfilename";
-
-	my $destdir = dirname( $srcfilename );
-	my $destfile = "$destroot$destdir";
-
-	if( $srcfilename =~ /nginx/ )
+	if( $srcdir =~ /nginx/ )
 	{
-		maint_warning( "chosen file $srcfilename, props=$showprops, dest $destfile" );
+		my $str = $srcfilename // "<UNDEF>";
+		maint_warning( "looking at $srcdir, found $str, props=$showprops, dest $destfile" );
 	}
+
+	unless( defined $srcfilename )
+	{
+		# should we "undist" the file?  ie. remove it?
+		my $undist = $props->{undist};
+		if( defined $undist && $undist eq "yes" )
+		{
+			#print "dedug: not disting $srcdir, undist=$undist\n";
+			#print "dedug: does $destfile exist?\n";
+			if( -f $destfile || -l $destfile )
+			{
+				deletefile($destfile);
+				next;
+			}
+		}
+		maint_debug( "No candidate for $srcdir, skipping");
+		next;
+	}
+
+	$props = $newprops;
+	$showprops = join( ',',
+		map { "$_=$props->{$_}" }
+			sort keys %$props );
+
+	#die "debug: srcfilename:$srcfilename, properties are ". Dumper($props);
+
+	#if( $srcfilename =~ /nginx/ )
+	#{
+	#	maint_warning( "chosen file $srcfilename, props=$showprops, dest $destfile" );
+	#}
 
 	# abs path now for file testing
 	$srcfilename = "$distbase$srcfilename";
@@ -122,7 +142,8 @@ foreach my $df (@distfiles)
 	# Prevent leaving .old files around.
 	# Should probably not leave .tmpnew around either..
 	my $noextrafiles =
-		( exists($props->{backup}) && $props->{backup} eq 'no' ) ? 1 : 0;
+		( exists($props->{backup}) && $props->{backup} eq 'no' ) ?
+		1 : 0;
 
 	# Check if we actually want to make a symlink using the one
 	# line content of $srcfilename
@@ -133,48 +154,23 @@ foreach my $df (@distfiles)
 	}
 
 	# Otherwise it's a regular file write/update
-	next unless copyinfile($srcfilename, $destfile, $noextrafiles) &&
-		    setowner($srcfilename, $destfile, $props) &&
-		    setgroup($srcfilename, $destfile, $props) &&
-		    setmode($srcfilename, $destfile, $props);
+	next unless copyinfile($srcfilename, $destfile, $noextrafiles);
+
+        unless( -e $destfile )
+        {
+		maint_warning( "Tried to copy to $destfile - file does not exist");
+		next;
+        }
+	setowner($srcfilename, $destfile, $props);
+	setgroup($srcfilename, $destfile, $props);
+	setmode($srcfilename, $destfile, $props);
 }
 
 # All done.
 maint_exit();
 
+
 # Subroutines
-
-# my @p = get_dist_list($base);
-#	Finds all non-empty directories under $base,
-#	returns relative pathnames with no "./"
-sub get_dist_list ($)
-{
-	my $base = shift;
-	my $pwd = getcwd();
-
-	maint_debug( "Determining files to dist from $base");
-	chdir($base) || maint_fatalerror( "Cannot cd into $base");
-	my @files = ();
-	find(
-		sub {
-			if( $File::Find::name =~ m/\.(svn|git)$/)
-			{
-				$File::Find::prune = 1;
-			} elsif( -f $_ )
-			{
-				my $dir = dirname( $File::Find::name );
-				$dir =~ s|^\./||;
-				push @files, $dir;
-			}
-		}, '.');
-
-	chdir($pwd);
-
-	my %map = ();
-	map { $map{$_}++ } @files;
-	return sort keys %map;
-}
-
 
 sub copyinfile
 {
@@ -195,24 +191,23 @@ sub copyinfile
 		mkpath( [$destdir], 0, 0755 );
 		unless( -d $destdir )
 		{
-			maint_warning( "Unable to make directory $destdir, skipping");
+			maint_warning( "Can't make directory $destdir, skipping");
 			return 0;
 		}
 	}
 	maint_debug( "Copying $srcfile to $destfile");
 
-	return maint_safecopy($srcfile, $destfile, undef, undef, undef, $noextrafiles);
+	return maint_safecopy($srcfile, $destfile, undef, undef, undef,
+		$noextrafiles);
 }
 
 
 sub setmode
 {
 	my( $srcfile, $destfile, $props ) = @_;
-	#my $props = maint_parsemods($srcfile);
 	unless( -e $destfile )
 	{
-		maint_warning( "setmode() - destination file $destfile does not exist");
-		return 0;
+		maint_fatalerror( "setmode() - no destination file $destfile");
 	}
 	my $mode;
 	$mode = oct($props->{mode}) if
@@ -220,8 +215,8 @@ sub setmode
 
 	if( defined $mode )
 	{
-		#maint_warning( "Would set mode $destfile to $mode" ); return;
-		maint_debug( "Setting $destfile mode to " . sprintf ("%o", $mode));
+		#maint_warning( "Would set mode $destfile to " . sprintf( "%o", $mode" ) ); return;
+		maint_debug( "Setting $destfile mode to " . sprintf("%o", $mode) );
 		unless( chmod( $mode, $destfile ) )
 		{
 			maint_warning( "Unable to chmod $mode $destfile");
@@ -237,8 +232,7 @@ sub setowner
         my( $srcfile, $destfile, $props ) = @_;
         unless( -e $destfile )
         {
-		maint_warning( "setowner() - destination file does not exist: $destfile");
-		return 0;
+		maint_fatalerror( "setowner() - no destination file $destfile");
         }
         my $owner = $props->{'owner'};
 
@@ -266,8 +260,7 @@ sub setgroup
         my( $srcfile, $destfile, $props ) = @_;
         unless( -e $destfile )
         {
-                 maint_warning( "setgroup() - destination file $destfile does not exist");
-		 return 0;
+		maint_fatalerror( "setgroup() - no destination file $destfile");
         }
         my $group = $props->{'group'};
 	return 1 unless defined( $group );
@@ -288,6 +281,7 @@ sub setgroup
 	return 1;
 }
 
+
 sub deletefile
 {
 	my( $dest ) = @_;
@@ -296,12 +290,13 @@ sub deletefile
 
 	unless( -e $dest || -l $dest )
 	{
-		maint_debug( "deletefile() - destination file $dest does not exist" );
+		maint_debug( "deletefile() - no destination file $dest" );
 		return 0;
 	}
 	maint_safedelete($dest);
 	return 1;
 }
+
 
 sub makesymlink
 {
