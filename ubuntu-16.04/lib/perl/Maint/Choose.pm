@@ -58,8 +58,6 @@ and returns a property hash.
 sub maint_parseproperties ($)
 {
   my $string = basename($_[0]);
-  die "debug: maint_pp: input $_[0], string $string\n";
-
   my @strparts = split(/\./, $string);
 
   shift @strparts;	# discard the filename
@@ -68,7 +66,7 @@ sub maint_parseproperties ($)
   foreach my $mod (@strparts)
   {
     my( $key, $value ) = split(/\-/, $mod, 2);
-    $props{$key} = $value;
+    $props{$key} = $value if defined $value;
   }
 
   return %props;
