@@ -240,7 +240,7 @@ sub maint_distchoose ($$$)
     }
     foreach my $class (@classes)
     {
-	maint_fatalerror( "class <<$class>> missing" ) unless defined $class && $class;
+	maint_fatalerror( "class <<$class>> missing, classes are @classes" ) unless defined $class && $class;
         my $classfile = "$distbase$under/$class";
 	my @g = glob("$classfile.*");
 	push @g, $classfile if -f $classfile;
