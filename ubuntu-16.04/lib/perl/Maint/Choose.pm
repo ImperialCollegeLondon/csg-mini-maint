@@ -55,6 +55,9 @@ and returns a property hash.
 
 =cut
 
+our %permittedprop = map { $_ => 1 }
+	qw(arch mode action backup owner group);
+
 sub maint_parseproperties ($)
 {
   my $string = basename($_[0]);
@@ -66,7 +69,7 @@ sub maint_parseproperties ($)
   foreach my $mod (@strparts)
   {
     my( $key, $value ) = split(/\-/, $mod, 2);
-    $props{$key} = $value if defined $value;
+    $props{$key} = $value if $permittedprop{$key} && defined $value;
   }
 
   return %props;
@@ -114,10 +117,15 @@ sub maint_getproperties ($$)
 		# and merge %newprops into %props
 		@props{keys %newprops} = values %newprops;
 	}
-	# find any properties at the end of the $path, in .key-value... form
+	# merge in any properties at the end of the $path, in .key-value... form
 	my %newprops = maint_parseproperties( $path );
-	# and merge them into %props
 	@props{keys %newprops} = values %newprops;
+
+	# sanitise: remove any unknown properties
+	foreach my $k (keys %props)
+	{
+	    delete $props{$k} unless $permittedprop{$k};
+	}
 
 	return %props;
 }
