@@ -93,11 +93,11 @@ foreach my $df (@distdata)
 		map { "$_=$props->{$_}" }
 			sort keys %$props );
 
-	if( $srcdir =~ /nginx/ )
-	{
-		my $str = $srcfilename // "<UNDEF>";
-		maint_warning( "looking at $srcdir, found $str, props=$showprops, dest $destfile" );
-	}
+	#if( $srcdir =~ /nginx/ )
+	#{
+	#	my $str = $srcfilename // "<UNDEF>";
+	#	maint_warning( "looking at $srcdir, found $str, props=$showprops, dest $destfile" );
+	#}
 
 	unless( defined $srcfilename )
 	{
