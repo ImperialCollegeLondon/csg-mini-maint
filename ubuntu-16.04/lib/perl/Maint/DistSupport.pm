@@ -248,7 +248,7 @@ sub maint_distchoose ($$$)
 
 	next if @g==0;
 	my %newprops = maint_parseproperties( $g[0] );
-	$g[0] =~ s|^$distbase/||;
+	$g[0] =~ s|^$distbase||;
 	my $myprops = { %$props };
 	@$myprops{keys %newprops} = values %newprops;
 
