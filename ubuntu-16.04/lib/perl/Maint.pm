@@ -120,7 +120,7 @@ sub loadconfig()
 	$text = read_file( $file ) ||
 		die "maint_init: can't slurp config file $file\n";
 	$configdata = decode_json( $text );
-	#die Dumper $configdata;
+	die Dumper $configdata;
 	%config = %$configdata;
 	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 
