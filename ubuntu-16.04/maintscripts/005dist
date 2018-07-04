@@ -83,7 +83,7 @@ foreach my $df (@distdata)
 
 	#print "debug: srcdir=$srcdir\n";
 
-	my ( $srcfilename, $newprops ) =
+	my( $srcfilename, $newprops ) =
 		maint_distchoose( $distbase, $srcdir, $props );
 
 	my $destdir = "$srcdir";

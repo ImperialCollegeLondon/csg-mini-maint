@@ -159,7 +159,7 @@ Finds all non-empty directories in the dist tree under $base,
 and their accompanying properties, returns an array of records.
 Each record is a hashref, of the form:
 	{ PATH => dirname, PROPS => property_hashref }
-Note that all PATHS are relative dirnames, under $base, with no "./"
+Note that all PATHS are logical dirnames, under $base, with a leading "/"
 
 =cut
 sub maint_distpaths ($)
