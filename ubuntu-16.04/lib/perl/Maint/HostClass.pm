@@ -169,7 +169,7 @@ sub _class_getall ($)
 
     unless( $source =~ s/^file:// )
     {
-        maint_log(LOG_ERR,
+        maint_fatalerror(
 		"Only 'file:' hostclass sources supported at this time ".
 		"(not $source)");
     }
@@ -180,7 +180,7 @@ sub _class_getall ($)
 
     unless( open( $infh, '<', $conffile ) )
     {
-        maint_log(LOG_ERR,
+        maint_fatalerror(
 		"Can't open hostclass source $conffile");
     }
 
@@ -222,7 +222,7 @@ sub _class_warndups ($)
     {
 		if ($ent->{child} eq $last->{child} and $ent->{parent} eq $last->{parent}) 
         {
-			maint_log(LOG_WARNING, "Duplicate classtable entry: $ent->{child}, $ent->{parent}");
+			maint_warning( "Duplicate classtable entry: $ent->{child}, $ent->{parent}");
 			return 0;
 		}
 		$last = $ent;
@@ -240,7 +240,7 @@ sub _class_sanity_r ($$@)
 	my $parents = _class_parents ($class, $classtable);
 	foreach my $parent (@$parents) {
 		if (scalar (grep ($parent eq $_, @list)) != 0) {
-			maint_log(LOG_WARNING, "Parent $parent of $class already in list [" . join ' ',@list . "]");
+			maint_warning( "Parent $parent of $class already in list [" . join ' ',@list . "]");
 			return 0;
 		}
 		_class_sanity_r ($classtable, $parent, @list) or return 0;
@@ -337,7 +337,7 @@ sub _class_merge ($) {
 		goto restart;
 	}
 
-	maint_log(LOG_WARNING, "Cannot reduce graph");
+	maint_warning( "Cannot reduce graph");
 	return undef;
 }
 
@@ -373,10 +373,10 @@ sub _class_setup ($)
 {
 	my( $hostname ) = @_;
 
-	#maint_log(LOG_ERR, 'Hostname not passed to _class_setup') unless
+	#maint_fatalerror( 'Hostname not passed to _class_setup') unless
 	#	defined $hostname;
 
-	maint_log(LOG_DEBUG, "Getting class info for '$hostname' and writing to $hostclassfile");
+	maint_debug( "Getting class info for '$hostname' and writing to $hostclassfile");
 
 	my $classtable;
         return undef unless $classtable = _class_getall( $hostclasssource );
@@ -384,8 +384,7 @@ sub _class_setup ($)
         # mwj 2008-7-15 -- this is bloody slow. commenting out for now
 #	unless( _class_sanity($classtable) )
 #       {
-#           maint_log(LOG_ERR, "Insane class table");
-#           return undef;
+#           maint_fatalerror( "Insane class table");
 #       }
 	my $linear = _class_linearise($hostname, $classtable);
 
@@ -393,14 +392,14 @@ sub _class_setup ($)
 
 	unless( @$linear > 1 )
         {
-            maint_log(LOG_WARNING, "No class data for host $hostname");
+            maint_warning( "No class data for host $hostname");
             return undef;
         }
 
 	my( $fd, $handle ) = maint_safeopen($hostclassfile, 0644);
 	unless( defined $fd )
         {
-            maint_log( LOG_ERR, "Cannot safe_open $hostclassfile");
+            maint_fatalerror( "Cannot safe_open $hostclassfile");
             return undef;
         }
 	foreach (@$linear) 
@@ -409,7 +408,7 @@ sub _class_setup ($)
         }
 	unless( maint_safeclose($handle) )
         {
-            maint_log(LOG_ERR, "Cannot safe_close $hostclassfile");
+            maint_fatalerror( "Cannot safe_close $hostclassfile");
             return undef;
         }
         return $linear;
@@ -420,7 +419,7 @@ sub _classes_from_file
 	my $infh;
         unless( open( $infh, '<', $hostclassfile ) )
         {
-            maint_log(LOG_DEBUG, "Cannot open class cache file: $hostclassfile" );
+            maint_debug( "Cannot open class cache file: $hostclassfile" );
             return ();
         }
     
@@ -433,7 +432,7 @@ sub _classes_from_file
 		push @classes, $_;
 	}
         close( $infh );
-	maint_warning( "classes_from_file(file $hostclassfile): classes are <<@classes>>" );
+	maint_debug( "classes_from_file(file $hostclassfile): classes are <<@classes>>" );
         return @classes;
 }
 
@@ -487,11 +486,11 @@ sub maint_listclasses ()
     
 	if( maint_reloadclasses() || @classesfromfile == 0 )
         {
-		maint_log(LOG_DEBUG, "Refreshing classes cache file");
+		maint_debug( "Refreshing classes cache file");
 		maint_reloadclasses(0); # Reset forcereload flag
 		unless( $classes = _class_setup( maint_hostname() ) )
 		{
-		    maint_log(LOG_WARNING, "Cannot build class table from ".
+		    maint_warning( "Cannot build class table from ".
 				"source - using cache as fallback");
 		}
 		maint_warning( 'linearised class data: [' . join (':', @$classes) . ']' );
@@ -502,14 +501,14 @@ sub maint_listclasses ()
 	}
 	unless( defined $classes && @$classes )
 	{
-		maint_log(LOG_ERR, "Cannot read any class data for this host - I have to die now");
+		maint_fatalerror( "Cannot read any class data for this host - I have to die now");
 	}
 	#maint_debug( 'Read class data: [' . join (':', @$classes) . ']' );
 	# Sanity check
 	my $h = maint_hostname();
 	unless( $h eq $$classes[0] )
 	{
-		maint_log(LOG_ERR, "Hostname in class list is not the same as our hostname, our=[$h], class is=[$$classes[0]]");
+		maint_fatalerror( "Hostname in class list is not the same as our hostname, our=[$h], class is=[$$classes[0]]");
 	}
 	@$class_cache = @$classes;
 	return @$classes;
@@ -540,15 +539,14 @@ sub maint_listclasshosts ($)
 
     _init_config();
 
-    maint_log(LOG_DEBUG, "Getting membership for class '$classname'");
+    maint_debug( "Getting membership for class '$classname'");
 
     my $classtable;
     return () unless $classtable = _class_getall( $hostclasssource );
     
     unless( _class_sanity($classtable) )
     {
-        maint_log(LOG_ERR, "Insane class table");
-        return ();
+        maint_fatalerror( "Insane class table");
     }
 
     # $classtable is an array ref (a list of hashes)
