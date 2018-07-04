@@ -184,16 +184,16 @@ sub _class_getall ($)
 		"Can't open hostclass source $conffile");
     }
 
-    my $r = [];
-
     my $dontcare = <$infh>;	# first line is titles..  assume order is
     				# always parent,child,priority
 
+    my $r = [];
     while( <$infh> )
     {
     	chomp;
 	my @r = split( /\s*,\s*/, $_ );
 	$r[2] //= 50;
+	next unless defined $r[0];
 	my $row = { parent => $r[0], child => $r[1], priority => $r[2] };
 	push @$r, $row;
     }
@@ -277,12 +277,12 @@ sub _class_pri_sort
 # internal function
 sub _class_parents ($$)
 {
-	my ($class, $classtable) = @_;
+	my( $class, $classtable ) = @_;
 	my $r = [];
 
 	foreach my $ent (@$classtable) 
         {
-		push (@$r, $ent) if ($ent->{child} eq $class);
+		push @$r, $ent if ($ent->{child} eq $class);
 	}
 
 	$r = [sort _class_pri_sort @$r];
@@ -382,12 +382,15 @@ sub _class_setup ($)
         return undef unless $classtable = _class_getall( $hostclasssource );
 
         # mwj 2008-7-15 -- this is bloody slow. commenting out for now
-#	unless (_class_sanity($classtable))
+#	unless( _class_sanity($classtable) )
 #       {
 #           maint_log(LOG_ERR, "Insane class table");
 #           return undef;
 #       }
 	my $linear = _class_linearise($hostname, $classtable);
+
+	maint_warning( 'class_linearise data: [' . join (':', @$linear) . ']' );
+
 	unless( @$linear > 1 )
         {
             maint_log(LOG_WARNING, "No class data for host $hostname");
@@ -402,7 +405,7 @@ sub _class_setup ($)
         }
 	foreach (@$linear) 
         { 
-            print $fd "$_\n" if $_;
+            print $fd "$_\n" if $_;	# DCW why the blank test?
         }
 	unless( maint_safeclose($handle) )
         {
