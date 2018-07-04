@@ -211,7 +211,7 @@ sub maint_parseproperties ($)
 
 This takes $distbase, the base of the dist tree, eg. .../dist, and
 $under, the relative path of a directory name under the $distbase,
-(eg etc/security/access.conf), and $props, a property hashref,
+(eg /etc/security/access.conf), and $props, a property hashref,
 and searches $distbase/$under for the most-precisely matching hostclass
 file, and also extracts any extra properties from the filename.
 
@@ -230,7 +230,7 @@ sub maint_distchoose ($$$)
     my @classes = maint_listclasses();
 
     #die "debug: distbase=$distbase, under=$under\n";
-    my $basedir = "$distbase/$under";
+    my $basedir = "$distbase$under";
     maint_debug( "debug maint_distchoose: distbase=$distbase, under=$under, basedir=$basedir" );
 
     unless( -d $basedir and -r $basedir )
@@ -240,7 +240,7 @@ sub maint_distchoose ($$$)
     }
     foreach my $class (@classes)
     {
-        my $classfile = "$distbase/$under/$class";
+        my $classfile = "$distbase$under/$class";
 	my @g = glob("$classfile.*");
 	push @g, $classfile if -f $classfile;
 	maint_fatalerror( "found $classfile.* classfiles @g" ) if @g > 1;
