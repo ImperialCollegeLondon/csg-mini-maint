@@ -9,9 +9,8 @@ our %EXPORT_TAGS = (
     'all' => [
         qw(
 	      maint_distpaths
-              maint_buggerme
+              maint_distchoose
               maint_parseproperties
-	      maint_getproperties
           )
     ]
 );
@@ -21,7 +20,6 @@ our @EXPORT    = qw(
 our $VERSION = '0.01';
 
 use Cwd;
-use File::Find;
 use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
@@ -61,13 +59,12 @@ Note that if a host is NEITHER spock nor in the 'SERVER' hostclass, it's
     use Maint::DistSupport qw(:all);
 
     maint_distpaths
-    maint_buggerme
+    maint_distchoose
     maint_parseproperties
-    maint_getproperties
 
 =head1 EXPORT
 
-None by default, :all will export maint_buggerme().
+None by default, :all will export maint_distchoose().
 
 =head1 FUNCTIONS
 
@@ -79,55 +76,83 @@ our %permittedprop = map { $_ => 1 }
 
 
 #
-# _handle_one( \@result, \%props, \%seen );
-#	Internal function called by maint_distpaths():
+# trav_dir( $dir, \@result, \%parentprops );
 #
-#	During a File::Find traverse, handle one file or directory
-#	$File::Find::name, updating @result if the file is inside a
-#	directory we haven't seen before.  %props is the current
-#	property hash (whenever we enter a new directory we look for a
-#	.props file, and update %props) and the set %seen is used
-#	(and updated) to determine whether we have seen a new directory before.
+#	traverse a dist-style $dir, looking for non-empty leaf directories
+#	and their properties.  Build the result in @result - a list of
+#	hash-records, each with fields PATH (a string) and PROPS (a hashref).
+#	%parentprops is the parental property hash.
 #
-sub _handle_one ($$$)
+#	Whenever we enter a new directory we look for an optional .props file,
+#	and build a new %props hash for this directory if it's found.
+#	then we grab the contents of the directory.  apart from the
+#	optional .props file (and '.' and '..'), either ALL the contents
+#	of $dir should be FILES or ALL should be DIRECTORIES.  die if
+#	there's a mixture.
+#
+#	we don't actually care about what files there are, just > 0 of
+#	them.  we do care about the subdirs, so we accumulate them.
+#
+sub trav_dir ($$$);
+sub trav_dir ($$$)
 {
-	my( $result, $props, $seen ) = @_;
+	my( $dir, $result, $parentprops ) = @_;
 
-	my $path = $File::Find::name;
-	$path =~ s|^\./||;
+	$dir =~ s|^\./||;
 
-	if( $path =~ m/\.(svn|git)$/)
+	#print "trav_dir: entering new dir $dir\n";
+	my $propfile = "$dir/.props";
+	my $myprops = $parentprops;
+	if( -f $propfile )
 	{
-		$File::Find::prune = 1;
-		return;
+		print "debug: found $propfile\n";
+		# form a new %props hash containing the inherited
+		# parental properties overlaid with the new properties
+		$myprops = { %$parentprops };
+		my %newprops = maint_readhash( $propfile );
+		@$myprops{keys %newprops} = values %newprops;
 	}
-	if( -d $path )
+
+	# read the contents of $dir
+        opendir(my $dh, $dir) || die;
+	my @subdirs;
+	my $nfiles = 0;
+	while( readdir $dh )
 	{
-		print "debug: entering new dir $path\n";
-		if( -f "$path/.props" )
+	    next if $_ eq '.' || $_ eq '..' || $_ eq '.props'
+	    	 || $_ eq '.svn' || $_ eq '.git';
+
+	    my $child = "$dir/$_";
+	    push @subdirs, $child if -d $child;
+	    $nfiles++ if -f $child;
+	}
+	closedir $dh;
+	@subdirs = sort @subdirs;
+	my $nsubdirs = @subdirs;
+
+	#print "trav_dir: in $dir, there are $nsubdirs sub dirs ".
+	#    "and $nfiles files\n";
+
+	die "trav_dir: in $dir, there are $nsubdirs sub dirs (>0) ".
+	    "and $nfiles files (>0)\n" if $nfiles && $nsubdirs;
+
+	if( $nsubdirs )
+	{
+		foreach my $subdir (@subdirs)
 		{
-			print "debug: found $path/.props\n";
-			# merge new properties into %$props
-			my %newprops = maint_readhash( "$path/.props" );
-			@$props{keys %newprops} = values %newprops;
+			trav_dir( $subdir, $result, $myprops );
 		}
-		return;
-	}
-	return unless -f $path;
-
-	print "debug: found new file $path\n";
-	my $dir = dirname( $path );
-	if( ! $seen->{$dir}++ )
+	} else
 	{
 		push @$result,
 			{
 				PATH  => $dir,
-				PROPS => { %$props },
+				PROPS => { %$myprops },
 			};
 	}
 }
 
-	
+
 =head2 B<my @p = maint_distpaths( $base );
 
 Finds all non-empty directories in the dist tree under $base,
@@ -146,11 +171,8 @@ sub maint_distpaths ($)
 	maint_debug( "Determining distpaths under $base");
 
 	my @result;	# array of hashrefs
-	my %seen;	# prevent duplicates
-	my %props;	# properties, from the top
-	find(
-		sub { _handle_one( \@result, \%props, \%seen ); },
-		'.' );
+	trav_dir( ".", \@result, {} );
+	#print Dumper \@result;
 
 	chdir($pwd);
 
@@ -167,88 +189,31 @@ and returns a property hash.
 
 sub maint_parseproperties ($)
 {
-  my $string = basename($_[0]);
-  maint_debug( "parseprops: string $string" );
-  my @strparts = split(/\./, $string);
+	my $string = basename($_[0]);
+	maint_debug( "parseprops: string $string" );
+	my @strparts = split(/\./, $string);
 
-  shift @strparts;	# discard the filename
+	shift @strparts;	# discard the filename
 
-  my %props;
-  foreach my $str (@strparts)
-  {
-    my( $key, $value ) = split(/[-=]/, $str, 2);
-    next unless $permittedprop{$key} && defined $value;
-    $props{$key} = $value;
-    maint_debug( " parseprops: found prop $key, value $value" );
-  }
-
-  return %props;
-}
-
-=head2 B<my %props = maint_getproperties( $distbase, $srcpath )>
-
-This takes $distbase, the base of the dist tree, eg. .../dist, and
-$srcpath, the absolute path of a file name in the $distbase, and
-figures out which properties should apply to that file by reading
-.props files.
-
-It returns a properties hash, empty if no .props files are found in
-the path from $distbase to $path..
-
-=cut
-
-sub maint_getproperties ($$)
-{
-	my( $distbase, $srcpath ) = @_;
-
-	maint_debug( "Getting properties for chosen file $srcpath" );
-
-	my $path = $srcpath;
-	$path =~ s|^$distbase/||;	# remove the distbase prefix..
-	$path = dirname($path);		# remove the hostclass filename suffix
-	maint_debug( "Getting properties: chosen path altered to $path" );
-
-	-d $distbase ||
-		maint_fatalerror( "getproperties: no such distbase $distbase" );
-
-	my $dir = $distbase;
 	my %props;
-
-	foreach my $name (split(m|/|,$path) )
+	foreach my $str (@strparts)
 	{
-		$dir .= "/$name";
-		-d $dir ||
-			maint_fatalerror( "getproperties: no such dir $dir" );
-		my $pfile = "$dir/.props";
-		-f $pfile || next;
-
-		# ok, found a .props file.. read it..
-		my %newprops = maint_readhash( $pfile );
-
-		# and merge %newprops into %props
-		@props{keys %newprops} = values %newprops;
+		my( $key, $value ) = split(/[-=]/, $str, 2);
+		next unless $permittedprop{$key} && defined $value;
+		$props{$key} = $value;
+		maint_debug( " parseprops: found prop $key, value $value" );
 	}
-	# merge in any .key-value.. properties at the end of the $srcpath
-	my %newprops = maint_parseproperties( $srcpath );
-	@props{keys %newprops} = values %newprops;
-
-	# sanitise: remove any unknown properties
-	foreach my $k (keys %props)
-	{
-	    delete $props{$k} unless $permittedprop{$k};
-	}
-
 	return %props;
 }
 
 
-=head2 B<my( $path, $props ) = maint_buggerme( $distbase, $under )>
+=head2 B<( my $path, $props ) = maint_distchoose( $distbase, $under, $props )>
 
 This takes $distbase, the base of the dist tree, eg. .../dist, and
 $under, the relative path of a directory name under the $distbase,
-(eg etc/security/access.conf), and searches $distbase/$under for the
-most-precisely matching hostclass file, and also figures out which
-properties should apply to that file.
+(eg etc/security/access.conf), and $props, a property hashref,
+and searches $distbase/$under for the most-precisely matching hostclass
+file, and also extracts any extra properties from the filename.
 
 Returns the relative path of the chosen file, of the form "$under/$hostclass",
 and a hashref $props of properties that apply to that file.
@@ -259,18 +224,18 @@ the order of this host's hostclasses, all under $distbase.
 
 =cut
 
-sub maint_buggerme ($$)
+sub maint_distchoose ($$$)
 {
-    my( $distbase, $under ) = @_;
+    my( $distbase, $under, $props ) = @_;
     my @classes = maint_listclasses();
 
     #die "debug: distbase=$distbase, under=$under\n";
     my $basedir = "$distbase/$under";
-    maint_debug( "debug maint_buggerme: distbase=$distbase, under=$under, basedir=$basedir" );
+    maint_debug( "debug maint_distchoose: distbase=$distbase, under=$under, basedir=$basedir" );
 
     unless( -d $basedir and -r $basedir )
     {
-        maint_warning( "maint_buggerme: $basedir is not a readable directory");
+        maint_warning( "maint_distchoose: $basedir is not a readable directory");
         return ( undef, undef );
     }
     foreach my $class (@classes)
@@ -281,9 +246,18 @@ sub maint_buggerme ($$)
 	maint_fatalerror( "found $classfile.* classfiles @g" ) if @g > 1;
 
 	next if @g==0;
-	my %props = maint_getproperties( $distbase, $g[0] );
+	my %newprops = maint_parseproperties( $g[0] );
 	$g[0] =~ s|^$distbase/||;
-	return ( $g[0], \%props );
+	my $myprops = { %$props };
+	@$myprops{keys %newprops} = values %newprops;
+
+	# sanitise: remove any unknown properties
+	foreach my $k (keys %$myprops)
+	{
+	    delete $myprops->{$k} unless $permittedprop{$k};
+	}
+
+	return ( $g[0], $myprops );
     }
     return ( undef, undef );
 }

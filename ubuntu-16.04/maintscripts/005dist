@@ -75,13 +75,17 @@ maint_fatalerror( "No dist destination root!" ) unless -d $destroot;
 
 my @distfiles = maint_distpaths( $distbase );
 
-maint_fatalerror( "distfiles are: ". Dumper( \@distfiles ) );
+#maint_fatalerror( "distfiles are: ". Dumper( \@distfiles ) );
 
-foreach my $srcdir (@distfiles)
+foreach my $df (@distfiles)
 {
+	my $srcdir = $df->{PATH};
+	my $props = $df->{PROPS};
+
 	#print "debug: srcdir=$srcdir\n";
 
-	my( $srcfilename, $props ) = maint_choose( $distbase, $srcdir );
+	( my $srcfilename, $props ) =
+		maint_distchoose( $distbase, $srcdir, $props );
 
 	unless( defined $srcfilename )
 	{

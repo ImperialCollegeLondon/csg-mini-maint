@@ -304,7 +304,7 @@ work.
 
 =cut
 
-our $_scriptname;
+our $_scriptname;	# cache the scriptname in case we cd around later
 
 sub maint_scriptname
 {
@@ -312,7 +312,7 @@ sub maint_scriptname
 
     my $progpath = Cwd::abs_path($0);
 
-    print "debug: scriptname: progpath=$progpath, dollar0=$0\n";
+    #print "debug: scriptname: progpath=$progpath, dollar0=$0\n";
 
     my( $name ) = ($progpath =~ m#[^/]+/([^/]+)$#);
     #my $name = basename( $progpath );
@@ -548,7 +548,7 @@ sub maint_mkpath (@) {
 
 =head2 B<%hash = maint_readhash( filename ) >
 
-read a file respresenting a hash (space separated key and value)
+read a file representing a hash (space separated key and value)
 
 =cut
 
