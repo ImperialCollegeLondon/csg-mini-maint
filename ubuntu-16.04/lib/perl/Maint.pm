@@ -124,7 +124,7 @@ sub loadconfig()
 		die "maint_init: can't slurp config file $file\n";
 	print "debug: second time, text = $text\n";
 	$configdata = decode_json( $text );
-	die Dumper $configdata;
+	#die Dumper $configdata;
 	%config = %$configdata;
 	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 
@@ -185,8 +185,9 @@ sub maint_init
 		maint_exit(1);
 		exit(0);
 	}
+	maint_reloadclasses(1);
 	my @classlist = maint_listclasses();
-	maint_log(LOG_ERR, "Cannot get class list") unless scalar @classlist > 0;
+	maint_log(LOG_ERR, "Cannot get class list") unless @classlist > 0;
 	unless( maint_checkrunon($scriptname, \@classlist) )
 	{
 		maint_log(LOG_DEBUG, "Skipping due to runon constraint");
