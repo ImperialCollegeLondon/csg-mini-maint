@@ -42,6 +42,7 @@ sub import
 use File::Basename;
 use File::Slurp;
 use JSON;
+use Data::Dumper;
 
 use Maint::Log qw(:all);
 use Maint::Lock qw(:all);
@@ -116,9 +117,12 @@ sub loadconfig()
 
 	# DCW.. force the maint script to REREAD the config from cachedir
 	$configdir = "$cachedir/config";
+	print "debug: second time, configdir = $configdir\n";
 	$file = "$configdir/info";
+	print "debug: second time, info = $file\n";
 	$text = read_file( $file ) ||
 		die "maint_init: can't slurp config file $file\n";
+	print "debug: second time, text = $text\n";
 	$configdata = decode_json( $text );
 	die Dumper $configdata;
 	%config = %$configdata;
