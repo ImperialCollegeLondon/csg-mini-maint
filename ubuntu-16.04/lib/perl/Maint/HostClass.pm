@@ -491,6 +491,7 @@ sub maint_listclasses ()
 		    maint_log(LOG_WARNING, "Cannot build class table from ".
 				"source - using cache as fallback");
 		}
+		maint_warning( 'linearised class data: [' . join (':', @$classes) . ']' );
 	}
 	else
 	{
@@ -500,7 +501,7 @@ sub maint_listclasses ()
 	{
 		maint_log(LOG_ERR, "Cannot read any class data for this host - I have to die now");
 	}
-	maint_log(LOG_DEBUG, 'Read class data: [' . join (':', @$classes) . ']' );
+	#maint_debug( 'Read class data: [' . join (':', @$classes) . ']' );
 	# Sanity check
 	my $h = maint_hostname();
 	unless( $h eq $$classes[0] )
