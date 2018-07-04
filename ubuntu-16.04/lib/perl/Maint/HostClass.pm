@@ -193,7 +193,7 @@ sub _class_getall ($)
     	chomp;
 	my @r = split( /\s*,\s*/, $_ );
 	$r[2] //= 50;
-	next unless defined $r[0];
+	next unless $r[0];
 	my $row = { parent => $r[0], child => $r[1], priority => $r[2] };
 	push @$r, $row;
     }
