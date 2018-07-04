@@ -70,7 +70,8 @@ sub maint_parseproperties ($)
   foreach my $str (@strparts)
   {
     my( $key, $value ) = split(/[-=]/, $str, 2);
-    $props{$key} = $value if $permittedprop{$key} && defined $value;
+    next unless $permittedprop{$key} && defined $value;
+    $props{$key} = $value;
     maint_info( " parseprops: found prop $key, value $value" );
   }
 
@@ -119,7 +120,7 @@ sub maint_getproperties ($$)
 		# and merge %newprops into %props
 		@props{keys %newprops} = values %newprops;
 	}
-	# merge in any properties at the end of the $path, in .key-value... form
+	# merge in any properties at the end of the $path, in .key-value.. form
 	my %newprops = maint_parseproperties( $path );
 	@props{keys %newprops} = values %newprops;
 
