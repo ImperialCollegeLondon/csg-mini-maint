@@ -414,7 +414,8 @@ sub _class_setup ($)
 
 sub _classes_from_file
 {
-        unless( open( my $infh, '<', $hostclassfile ) )
+	my $infh;
+        unless( open( $infh, '<', $hostclassfile ) )
         {
             maint_log(LOG_DEBUG, "Cannot open class cache file: $hostclassfile" );
             return ();
