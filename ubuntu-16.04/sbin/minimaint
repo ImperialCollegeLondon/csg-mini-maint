@@ -229,11 +229,7 @@ sub runmaintscript
 		maint_warning( "file $scriptpath doesn't exist");
 		return 0;
 	}
-	#unless( -x $scriptpath )
-	#{
-	#	maint_warning( "script $scriptpath isn't executable - skipping");
-	#	return 0;
-	#}
+	# DCW.. umm? 1 or 1??
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
