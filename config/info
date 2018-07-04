@@ -4,7 +4,7 @@
 	"lsbrelease":		"16.04",
 	"hostclass:source":	"file:hostclass",
 	"hostclass:file":	"/tmp/hostclass",
-	"cachedir":		"/tmp/minimaint",
+	"cachedir":		"/tmp/minimaint.cache",
 	"lockdir":		"/tmp/minimaint.lock",
 	"rundir":		"/tmp/minimaint.run",
 	"safefile:triggers":	"safe_file_triggers.json",
