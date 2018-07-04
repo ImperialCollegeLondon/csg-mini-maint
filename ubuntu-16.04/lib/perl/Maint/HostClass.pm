@@ -388,7 +388,7 @@ sub _class_setup ($)
 #       }
 	my $linear = _class_linearise($hostname, $classtable);
 
-	maint_warning( 'class_linearise data: [' . join (':', @$linear) . ']' );
+	maint_debug( 'class_linearise data: [' . join (':', @$linear) . ']' );
 
 	unless( @$linear > 1 )
         {
@@ -493,7 +493,7 @@ sub maint_listclasses ()
 		    maint_warning( "Cannot build class table from ".
 				"source - using cache as fallback");
 		}
-		maint_warning( 'linearised class data: [' . join (':', @$classes) . ']' );
+		maint_debug( 'linearised class data: [' . join (':', @$classes) . ']' );
 	}
 	else
 	{
