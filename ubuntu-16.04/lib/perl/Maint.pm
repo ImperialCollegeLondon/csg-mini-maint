@@ -41,7 +41,6 @@ sub import
 
 use File::Basename;
 use File::Slurp;
-use JSON;
 use Data::Dumper;
 
 use Maint::Log qw(:all);
@@ -99,6 +98,27 @@ our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
 
 #
+# my %hash = readhash( $filename );
+#	read a file representing a hash (space separated key and value)
+#
+sub readhash ($)
+{
+	my( $filename ) = @_;
+	my %hash = ();
+	open( my $fh, '<', $filename ) || return %hash;
+	while( <$fh> )
+	{
+		chomp;
+		s/^\s+//; s/\s+$//;
+		next if /^#/;
+		my( $k, $v ) = split( /\s+/, $_, 2 );
+		$hash{$k} = $v;
+	}
+	return %hash;
+}
+
+
+#
 # loadphase1config();
 #	load the compulsory configuration file..
 #
@@ -106,21 +126,19 @@ sub loadphase1config()
 {
 	$configdir = $ENV{MM_CONFIG_DIR} // "/etc/minimaint";
 	my $file = "$configdir/phase1";	# phase 1 configuration
-	my $text = read_file( $file ) ||
-		die "minimaint: can't slurp phase 1 config file $file\n";
-	my $configdata = decode_json($text);
-	#die Dumper $configdata;
-	%config = %$configdata;
+	%config = readhash( $file );
+	die "maint_init: can't read phase 1 config file $file\n"
+		unless %config;
 
 	# which distro (eg Ubuntu)
-	my $lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
+	my $lsbid = $config{lsbid} || die "maint_init: no config lsbid\n";
 
 	# which release of Ubuntu (eg 16.04)
 	my $lsbrelease = $config{lsbrelease} ||
-		die "minimaint: no config lsbrelease\n";
+		die "maint_init: no config lsbrelease\n";
 
 	$distribution = lc("$lsbid-$lsbrelease");
-	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 
 	my $maintroot = "$cachedir/$distribution";
 	$config{maintroot} = $maintroot;
@@ -137,16 +155,15 @@ sub loadphase2config ($)
 {
 	my( $phase2filename ) = @_;
 
-	maint_debug( "maint_init phase2: configdir=$configdir, phase2filename=$phase2filename" );
+	maint_debug( "maint_init phase2: phase2filename=$phase2filename" );
 
-	my $text = read_file( $phase2filename ) ||
-		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
-	my $newconfigdata = decode_json($text);
-	#die Dumper $newconfigdata;
-	# merge newconfigdata into %config
-	@config{keys %$newconfigdata} = values %$newconfigdata;
+	my %newconfig = readhash( $phase2filename );
+	die "maint_init: can't slurp phase 2 config file $phase2filename\n"
+		unless %newconfig;
+	# merge %newconfig into %config
+	@config{keys %newconfig} = values %newconfig;
 
-	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 }
 
 

@@ -1,10 +1,8 @@
-{
-	"gitrepo": 		"git@github.com:ImperialCollegeLondon/csg-mini-maint.git",
-	"lsbid":   		"Ubuntu",
-	"lsbrelease":		"16.04",
-	"hostclass:source":	"file:hostclass",
-	"hostclass:file":	"/tmp/hostclass",
-	"cachedir":		"/tmp/minimaint.cache",
-	"lockdir":		"/tmp/minimaint.lock",
-	"rundir":		"/tmp/minimaint.run"
-}
+gitrepo 		git@github.com:ImperialCollegeLondon/csg-mini-maint.git
+lsbid	  		Ubuntu
+lsbrelease		16.04
+hostclass:source	file:hostclass
+hostclass:file		/tmp/hostclass
+cachedir		/tmp/minimaint.cache
+lockdir			/tmp/minimaint.lock
+rundir			/tmp/minimaint.run

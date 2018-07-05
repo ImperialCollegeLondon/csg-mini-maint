@@ -1,10 +1,8 @@
-{
-	"safefile:triggers":	"safe_file_triggers.json",
-	"dist:root":		"/tmp/minimaint.root",
-	"hello:runwhen":	"boot,cron-60m",
-	"hello:runon":		"ALLHOSTS",
-	"goodbye:runwhen":	"cron-15m",
-	"goodbye:runon":	"CLIENT",
-	"dist:runwhen":		"boot,cron-15m",
-	"dist:runon":		"ALLHOSTS"
-}
+safefile:triggers	safe_file_triggers.json
+dist:root		/tmp/minimaint.root
+hello:runwhen		boot,cron-60m
+hello:runon		ALLHOSTS
+goodbye:runwhen		cron-15m
+goodbye:runon		CLIENT
+dist:runwhen		boot,cron-15m
+dist:runon		ALLHOSTS
