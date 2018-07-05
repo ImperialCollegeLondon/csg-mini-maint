@@ -241,7 +241,7 @@ sub setowner
 	if( $> != 0 )
 	{
 		maint_warning( "Would set owner $destfile to $owner if root" );
-		return;
+		return 0;
 	}
 
 	# Validate owner to be done later.
@@ -268,7 +268,7 @@ sub setgroup
 	if( $> != 0 )
 	{
 		maint_warning( "Would set group $destfile to $group if root" );
-		return;
+		return 0;
 	}
 
 	# Validate group to be done later.
