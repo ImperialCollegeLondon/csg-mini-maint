@@ -95,45 +95,58 @@ group from each included module.
 our $configdir;			# where the config lives
 our $cachedir;			# where to store local src eg /var/cache/minimaint
 our %config;			# the config hash
-our $lsbid;			# which distro (eg Ubuntu)
-our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
 
 #
-# loadconfig();
+# loadphase1config();
 #	load the compulsory configuration file..
 #
-sub loadconfig()
+sub loadphase1config()
 {
-	$configdir = "/etc/minimaint";
-	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
-	my $file = "$configdir/info";
+	$configdir = $ENV{MM_CONFIG_DIR} // "/etc/minimaint";
+	my $file = "$configdir/phase1";	# phase 1 configuration
 	my $text = read_file( $file ) ||
-		die "maint_init: can't slurp config file $file\n";
-	my $configdata = decode_json( $text );
-	#die Dumper $configdata;
-	$cachedir = $configdata->{cachedir} || die "maint_init: no config cachedir (first time)\n";
-
-	# DCW.. force the maint script to REREAD the config from cachedir
-	$configdir = "$cachedir/config";
-	#print "debug: second time, configdir = $configdir\n";
-	$file = "$configdir/info";
-	#print "debug: second time, info = $file\n";
-	$text = read_file( $file ) ||
-		die "maint_init: can't slurp config file $file\n";
-	#print "debug: second time, text = $text\n";
-	$configdata = decode_json( $text );
+		die "minimaint: can't slurp phase 1 config file $file\n";
+	my $configdata = decode_json($text);
 	#die Dumper $configdata;
 	%config = %$configdata;
-	$cachedir = $config{cachedir} || die "maint_init: no config cachedir\n";
 
-	$lsbid = $config{lsbid} || die "maint_init: no config lsbid\n";
-	$lsbrelease = $config{lsbrelease} ||
-		die "maint_init: no config lsbrelease\n";
+	# which distro (eg Ubuntu)
+	my $lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
+
+	# which release of Ubuntu (eg 16.04)
+	my $lsbrelease = $config{lsbrelease} ||
+		die "minimaint: no config lsbrelease\n";
+
 	$distribution = lc("$lsbid-$lsbrelease");
-	my $maintroot = "$config{cachedir}/$distribution";
+	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+
+	my $maintroot = "$cachedir/$distribution";
 	$config{maintroot} = $maintroot;
+
+	print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
+}
+
+
+#
+# loadphase2config( $phase2filename );
+#	load the second phase compulsory configuration file..
+#
+sub loadphase2config ($)
+{
+	my( $phase2filename ) = @_;
+
+	print "debug phase2: configdir=$configdir, phase2filename=$phase2filename\n";
+
+	my $text = read_file( $phase2filename ) ||
+		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
+	my $newconfigdata = decode_json($text);
+	#die Dumper $newconfigdata;
+	# merge newconfigdata into %config
+	@config{keys %$newconfigdata} = values %$newconfigdata;
+
+	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
 }
 
 
@@ -146,7 +159,10 @@ Must be called exactly once at the beginning of any script using Maint.
 sub maint_init
 {
 	# load the config..
-	loadconfig();
+	loadphase1config();
+
+	my $phase2filename = "$configdir/phase2";
+	loadphase2config( $phase2filename );
 
 	# copy $configdir and %config into maint's inner depths..
 	maint_setconfig( $configdir, \%config );

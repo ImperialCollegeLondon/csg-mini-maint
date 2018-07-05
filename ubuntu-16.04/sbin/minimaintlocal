@@ -81,16 +81,15 @@ our $scriptlock = 'maint-driver';
 # features!
 
 #
-# loadconfig();
+# loadphase1config();
 #	load the compulsory configuration file..
 #
-sub loadconfig()
+sub loadphase1config()
 {
-	$configdir = "/etc/minimaint";
-	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
-	my $file = "$configdir/info";
+	$configdir = $ENV{MM_CONFIG_DIR} // "/etc/minimaint";
+	my $file = "$configdir/phase1";	# phase 1 configuration
 	my $text = read_file( $file ) ||
-		die "minimaint: can't slurp config file $file\n";
+		die "minimaint: can't slurp phase 1 config file $file\n";
 	my $configdata = decode_json($text);
 	#die Dumper $configdata;
 	%config = %$configdata;
@@ -101,62 +100,11 @@ sub loadconfig()
 		die "minimaint: no config lsbrelease\n";
 	$distribution = lc("$lsbid-$lsbrelease");
 	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
-}
 
+	my $maintroot = "$cachedir/$distribution";
+	$config{maintroot} = $maintroot;
 
-#
-# fullclone( $git, $giturl, $repodest );
-#	blow the destination target dir away, fresh clone.
-#
-sub fullclone ($$$)
-{
-	my( $git, $giturl, $repodest ) = @_;
-
-	my $origdir = getcwd();
-
-	print "Clone failed; retrying from first principles...\n";
-	system("rm -rf $repodest");
-	mkpath([$repodest], 0, 0755);
-	chdir($repodest);
-
-	system("$git clone --depth 1 --quiet $giturl $repodest") == 0 ||
-		die "Clone still failed, failed\n";
-
-	chdir( $origdir );
-}
-
-
-#
-# loadcache( $giturl, $repodest );
-#	Synchronize our local cache from upstream via git,
-#	given $giturl, the remote url to grab, and
-#	$repodest, the path to store our local cache,
-#	e.g. /var/cache/minimaint/.
-#
-sub loadcache ($$)
-{
-	my( $giturl, $repodest ) = @_;
-
-	mkpath([$repodest], 0, 0755) unless -d $repodest;
-
-	-d $repodest || die "Cannot create directory $repodest\n";
-	-w $repodest || die "directory $repodest not writable!\n";
-
-	my $git = "/usr/bin/git";
-
-	# If we don't have any local version of the repository at all,
-	# create a new clone.
-	unless( -e "$repodest/.git" )
-	{
-		print "Cloning maint repository to $repodest...\n";
-		system("$git clone --depth 1 --quiet $giturl $repodest") == 0
-			|| fullclone( $git, $giturl, $repodest );
-	}
-
-	# Update the current repository using a simple fast-forward strategy.
-	chdir($repodest);
-	system("$git pull --quiet --ff-only") == 0
-		|| fullclone( $git, $giturl, $repodest );
+	print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
 }
 
 
@@ -195,10 +143,7 @@ sub bootstrap()
 	$ENV{PATH} = '/bin:/sbin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin';
 	mkpath( [$cachedir], 0, 0755) unless -d $cachedir;
 
-	# DCW not now, use local files..
-	#print "Syncing local cache...\n";
-	#loadcache( $gitrepo, $cachedir );
-	#$maintroot = $cachedir;
+	# DCW use local files..
 
 	$maintroot = "$origdir/..";
 	#print "debug bootstrap: maintroot=$maintroot\n";
@@ -217,12 +162,33 @@ sub bootstrap()
 # OS, then run the bootstrap sequence *right now* so that we can.
 
 BEGIN {
-	loadconfig();
+	loadphase1config();
 	check_os_version();
 	bootstrap();
 }
 
 # From now on, we CAN use Maint functions..
+
+
+#
+# loadphase2config( $phase2filename );
+#	load the second phase compulsory configuration file..
+#
+sub loadphase2config ($)
+{
+	my( $phase2filename ) = @_;
+
+	print "debug phase2: configdir=$configdir, phase2filename=$phase2filename\n";
+
+	my $text = read_file( $phase2filename ) ||
+		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
+	my $newconfigdata = decode_json($text);
+	#die Dumper $newconfigdata;
+	# merge newconfigdata into %config
+	@config{keys %$newconfigdata} = values %$newconfigdata;
+
+	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+}
 
 
 #
@@ -238,11 +204,7 @@ sub runmaintscript
 		maint_warning( "file $scriptpath doesn't exist");
 		return 0;
 	}
-	#unless( -x $scriptpath )
-	#{
-	#	maint_warning( "script $scriptpath isn't executable - skipping");
-	#	return 0;
-	#}
+	# DCW.. umm? 1 or 1??
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
@@ -310,6 +272,12 @@ sub findscripts()
 
 # --- Main program ----------------------------------------------------------
 
+$configdir = "$maintroot/config";
+my $phase2filename = "$configdir/phase2";
+loadphase2config( $phase2filename );
+
+# Tell the maint scripts that we're about to invoke where their configdir is
+$ENV{MM_CONFIG_DIR} = $configdir;
 
 # copy $configdir and %config into maint's inner depths..
 maint_setconfig( $configdir, \%config );
@@ -359,7 +327,7 @@ if( maint_getattr( "list" ) == 1 )
 my $cd = maint_getconfigdir();
 my $chs = maint_getconfig( "hostclass:source" );
 my $chf = maint_getconfig( "hostclass:file" );
-maint_debug( "Configdir=$cd, hostclass:source=$chs, hostclass:file=$chf" );
+maint_info( "Configdir=$cd, hostclass:source=$chs, hostclass:file=$chf" );
 
 # Reload cached class data
 maint_lockname($scriptlock);

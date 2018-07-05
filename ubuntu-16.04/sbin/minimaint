@@ -81,16 +81,15 @@ our $scriptlock = 'maint-driver';
 # features!
 
 #
-# loadconfig();
+# loadphase1config();
 #	load the compulsory configuration file..
 #
-sub loadconfig()
+sub loadphase1config()
 {
-	$configdir = "/etc/minimaint";
-	$configdir = $ENV{MM_CONFIG_DIR} if defined $ENV{MM_CONFIG_DIR};
-	my $file = "$configdir/info";
+	$configdir = $ENV{MM_CONFIG_DIR} // "/etc/minimaint";
+	my $file = "$configdir/phase1";	# phase 1 configuration
 	my $text = read_file( $file ) ||
-		die "minimaint: can't slurp config file $file\n";
+		die "minimaint: can't slurp phase 1 config file $file\n";
 	my $configdata = decode_json($text);
 	#die Dumper $configdata;
 	%config = %$configdata;
@@ -101,6 +100,8 @@ sub loadconfig()
 		die "minimaint: no config lsbrelease\n";
 	$distribution = lc("$lsbid-$lsbrelease");
 	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+
+	print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
 }
 
 
@@ -208,12 +209,30 @@ sub bootstrap()
 # OS, then run the bootstrap sequence *right now* so that we can.
 
 BEGIN {
-	loadconfig();
+	loadphase1config();
 	check_os_version();
 	bootstrap();
 }
 
 # From now on, we CAN use Maint functions..
+
+
+#
+# loadphase2config( $phase2filename );
+#	load the second phase compulsory configuration file..
+#
+sub loadphase2config ($)
+{
+	my( $phase2filename ) = @_;
+	my $text = read_file( $phase2filename ) ||
+		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
+	my $newconfigdata = decode_json($text);
+	#die Dumper $newconfigdata;
+	# merge newconfigdata into %config
+	@config{keys %$newconfigdata} = values %$newconfigdata;
+
+	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+}
 
 
 #
@@ -298,6 +317,11 @@ sub findscripts()
 
 # --- Main program ----------------------------------------------------------
 
+my $phase2filename = "$configdir/phase2";
+loadphase2config( $phase2filename );
+
+# Tell the maint scripts that we're about to invoke where their configdir is
+$ENV{MM_CONFIG_DIR} = $configdir;
 
 # copy $configdir and %config into maint's inner depths..
 maint_setconfig( $configdir, \%config );

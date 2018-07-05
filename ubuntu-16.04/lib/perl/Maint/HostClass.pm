@@ -376,7 +376,7 @@ sub _class_setup ($)
 	#maint_fatalerror( 'Hostname not passed to _class_setup') unless
 	#	defined $hostname;
 
-	maint_debug( "Getting class info for '$hostname' and writing to $hostclassfile");
+	maint_debug( "Getting class info for '$hostname'");
 
 	my $classtable;
         return undef unless $classtable = _class_getall( $hostclasssource );
@@ -386,9 +386,10 @@ sub _class_setup ($)
 #       {
 #           maint_fatalerror( "Insane class table");
 #       }
+
 	my $linear = _class_linearise($hostname, $classtable);
 
-	maint_debug( 'class_linearise data: [' . join (':', @$linear) . ']' );
+	maint_debug( 'class_linearise result: [' . join (':', @$linear) . ']' );
 
 	unless( @$linear > 1 )
         {
@@ -397,20 +398,17 @@ sub _class_setup ($)
         }
 
 	my( $fd, $handle ) = maint_safeopen($hostclassfile, 0644);
-	unless( defined $fd )
-        {
-            maint_fatalerror( "Cannot safe_open $hostclassfile");
-            return undef;
-        }
+        maint_fatalerror( "Cannot safe_open $hostclassfile") unless
+		defined $fd;
+
+	maint_debug( "Writing class info to $hostclassfile");
+
 	foreach (@$linear) 
         { 
             print $fd "$_\n";
         }
-	unless( maint_safeclose($handle) )
-        {
-            maint_fatalerror( "Cannot safe_close $hostclassfile");
-            return undef;
-        }
+        maint_fatalerror( "Cannot safe_close $hostclassfile") unless
+		maint_safeclose($handle);
         return $linear;
 }
 
@@ -465,45 +463,44 @@ sub _class_flatten ($$)
 Returns the class linearisation as an array of strings or undef on error
 
 If maint_reloadclasses returns true, or the cache file is missing or empty,
-this will force the list to be regenerated from the database and will refresh 
-the contents of the local class cache file.
+this will force the list to be regenerated from the hostclass source (file
+or database* when supported) and refreshes the contents of the local class
+cache file.
 
 =cut
 
 sub maint_listclasses () 
 {
+	_init_config();
+
         return @$class_cache if
     	    defined $class_cache && !maint_reloadclasses();   # Save work...
 
-	_init_config();
-
-        my @classesfromfile;
-        if( -f $hostclassfile )
-	{
-		@classesfromfile = _classes_from_file();
-	}
         my $classes=[];
     
-	if( maint_reloadclasses() || @classesfromfile == 0 )
+	if( maint_reloadclasses() )
         {
 		maint_debug( "Refreshing classes cache file");
-		maint_reloadclasses(0); # Reset forcereload flag
 		unless( $classes = _class_setup( maint_hostname() ) )
 		{
 		    maint_warning( "Cannot build class table from ".
 				"source - using cache as fallback");
 		}
-		maint_debug( 'linearised class data: [' . join (':', @$classes) . ']' );
+		maint_reloadclasses(0); # Reset forcereload flag
+		#maint_debug( 'listclasses: linearised class data: ['
+		#	. join (':', @$classes) . ']' );
 	}
-	else
+	elsif( -f $hostclassfile )
 	{
-		@$classes = @classesfromfile;
+		@$classes = _classes_from_file();
+		#maint_debug( 'listclasses: linearised class data from file: ['
+		#	. join (':', @$classes) . ']' );
 	}
-	unless( defined $classes && @$classes )
-	{
-		maint_fatalerror( "Cannot read any class data for this host - I have to die now");
-	}
-	#maint_debug( 'Read class data: [' . join (':', @$classes) . ']' );
+	maint_fatalerror( "Cannot read any class data for this host")
+		unless @$classes;
+	#maint_debug( 'Linearised class data: [' .
+	#		join (':', @$classes) . ']' );
+
 	# Sanity check
 	my $h = maint_hostname();
 	unless( $h eq $$classes[0] )
