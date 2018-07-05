@@ -125,7 +125,7 @@ sub loadphase1config()
 	my $maintroot = "$cachedir/$distribution";
 	$config{maintroot} = $maintroot;
 
-	print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
+	maint_debug( "maint_init phase1: configdir=$configdir, cachedir=$cachedir" );
 }
 
 
@@ -137,7 +137,7 @@ sub loadphase2config ($)
 {
 	my( $phase2filename ) = @_;
 
-	print "debug phase2: configdir=$configdir, phase2filename=$phase2filename\n";
+	maint_debug( "maint_init phase2: configdir=$configdir, phase2filename=$phase2filename" );
 
 	my $text = read_file( $phase2filename ) ||
 		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
