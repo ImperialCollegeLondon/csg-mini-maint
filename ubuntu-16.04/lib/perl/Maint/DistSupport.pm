@@ -20,11 +20,12 @@ our @EXPORT    = qw(
 our $VERSION = '0.01';
 
 use Cwd;
+use File::Basename;
+use Data::Dumper;
 use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
 use Maint::Util qw(:all);
-use File::Basename;
 
 =head1 NAME
 
@@ -79,9 +80,23 @@ our %permittedprop = map { $_ => 1 }
 # trav_dir( $dir, \@result, \%parentprops );
 #
 #	traverse a dist-style $dir, looking for non-empty leaf directories
-#	and their properties.  Build the result in @result - a list of
-#	hash-records, each with fields PATH (a string) and PROPS (a hashref).
-#	%parentprops is the parental property hash.
+#	and their properties.  %parentprops is the property hash
+#	applying to this directory.
+#	Build the result in @result - a list of hash-records, each of the form:
+#	{
+#		PATH       => dirname,
+#		PROPS      => property_hashref,
+#		CLASSFILES => class_to_props_hashref
+#	}
+#	- PATH is the logical leaf-dir dirname, with a leading "/"
+#	  (eg "/etc/security/access.conf").
+#	- PROPS stores the inherited properties for this PATH,
+#	- CLASSFILES (new) stores the info about all class-specific files
+#	  within that PATH (directory in the dist tree),
+#	  eg CLASSFILES might contain an entry mapping "HOSTDOC" to
+#	    { FILE => "HOSTDOC.mode-0644" }, FPROPS => {mode => '0644'}, }
+#	  (the "FILE" atttribute is omitted if FILE is the same as the
+#	  hostclass name, eg "HOSTDOC")
 #
 #	Whenever we enter a new directory we look for an optional .props file,
 #	and build a new %props hash for this directory if it's found.
@@ -116,7 +131,7 @@ sub trav_dir ($$$)
 	# read the contents of $dir
         opendir(my $dh, $dir) || die;
 	my @subdirs;
-	my $nfiles = 0;
+	my @files;
 	while( readdir $dh )
 	{
 	    next if $_ eq '.' || $_ eq '..' || $_ eq '.props'
@@ -124,11 +139,12 @@ sub trav_dir ($$$)
 
 	    my $child = "$dir/$_";
 	    push @subdirs, $child if -d $child;
-	    $nfiles++ if -f $child;
+	    push @files, $_ if -f $child;
 	}
 	closedir $dh;
 	@subdirs = sort @subdirs;
 	my $nsubdirs = @subdirs;
+	my $nfiles = @files;
 
 	#print "trav_dir: in $dir, there are $nsubdirs sub dirs ".
 	#    "and $nfiles files\n";
@@ -144,10 +160,23 @@ sub trav_dir ($$$)
 		}
 	} else
 	{
+		my %classes;
+		foreach my $file (@files)
+		{
+			my( $basename, %fileprops ) =
+				maint_parseproperties( $file );
+			$classes{$basename} =
+			{
+				FPROPS => { %fileprops },
+			};
+			$classes{$basename}{FILE} = $file unless
+				$file eq $basename;
+		}
 		push @$result,
 			{
 				PATH  => "/$dir",
 				PROPS => { %$myprops },
+				CLASSFILES => { %classes },
 			};
 	}
 }
@@ -158,8 +187,17 @@ sub trav_dir ($$$)
 Finds all non-empty directories in the dist tree under $base,
 and their accompanying properties, returns an array of records.
 Each record is a hashref, of the form:
-	{ PATH => dirname, PROPS => property_hashref }
+	{
+		PATH => dirname,
+		PROPS => property_hashref,
+		CLASSFILES => class_to_props_hashref
+	}
 Note that all PATHS are logical dirnames, under $base, with a leading "/"
+PROPS stores the inherited properties for this PATH,
+and CLASSFILES (new) stores the info about all class-specific files
+within that PATH (directory in the dist tree),
+eg CLASSFILES might contain an entry mapping "HOSTDOC" to
+	{ FPROPS => {mode => '0644'},  FILE => "HOSTDOC.mode-0644" }
 
 =cut
 sub maint_distpaths ($)
@@ -180,10 +218,11 @@ sub maint_distpaths ($)
 }
 
 
-=head2 B<my %props = maint_parseproperties( $string )>
+=head2 B<my $basename, %props ) = maint_parseproperties( $string )>
 
-Parses $string for dotted suffix modifiers (of the form .key-value...)
-and returns a property hash.
+Parses $string for dotted suffix properties (of the form .key-value...)
+and returns the basename of $string (without the suffix properties)
+and %props, the property hash (containing the suffix properties).
 
 =cut
 
@@ -191,9 +230,12 @@ sub maint_parseproperties ($)
 {
 	my $string = basename($_[0]);
 	maint_debug( "parseprops: string $string" );
+
+	# problems if hostclasses OR HOSTNAMES ever have '.'s in them!
+	# eg. if hostnames are ever FQDNs?
 	my @strparts = split(/\./, $string);
 
-	shift @strparts;	# discard the filename
+	my $basename = shift @strparts;
 
 	my %props;
 	foreach my $str (@strparts)
@@ -203,17 +245,17 @@ sub maint_parseproperties ($)
 		$props{$key} = $value;
 		maint_debug( " parseprops: found prop $key, value $value" );
 	}
-	return %props;
+	return( $basename, %props );
 }
 
 
-=head2 B<( my $path, $props ) = maint_distchoose( $distbase, $under, $props )>
+=head2 B<my( $path, $newprops ) = maint_distchoose( $distbase, $under, $props, $distclasses )>
 
-This takes $distbase, the base of the dist tree, eg. .../dist, and
+This takes $distbase, the base of the dist tree, eg. .../dist,
 $under, the relative path of a directory name under the $distbase,
-(eg /etc/security/access.conf), and $props, a property hashref,
-and searches $distbase/$under for the most-precisely matching hostclass
-file, and also extracts any extra properties from the filename.
+(eg /etc/security/access.conf), $props, a property hashref, and
+$distclasses, the "which class files existed in $distbase/$under" info,
+and locates the most-precisely matching hostclass file that this host is in.
 
 Returns the relative path of the chosen file, of the form "$under/$hostclass",
 and a hashref $props of properties that apply to that file.
@@ -224,33 +266,35 @@ the order of this host's hostclasses, all under $distbase.
 
 =cut
 
-sub maint_distchoose ($$$)
+sub maint_distchoose ($$$$)
 {
-    my( $distbase, $under, $props ) = @_;
+    my( $distbase, $under, $props, $distclasses ) = @_;
     my @classes = maint_listclasses();
 
     #die "debug: distbase=$distbase, under=$under\n";
     my $basedir = "$distbase$under";
-    maint_debug( "debug maint_distchoose: distbase=$distbase, under=$under, basedir=$basedir" );
+    maint_debug( "distchoose: distbase=$distbase, under=$under, basedir=$basedir" );
+
+    #maint_info( "distchoose: under=$under, distclasses=".Dumper($distclasses) );
 
     unless( -d $basedir and -r $basedir )
     {
-        maint_warning( "maint_distchoose: $basedir is not a readable directory");
+        maint_warning( "distchoose: $basedir is not a readable directory");
         return ( undef, undef );
     }
     foreach my $class (@classes)
     {
 	maint_fatalerror( "class <<$class>> empty, classes are <<@classes>>" ) unless defined $class && $class;
-        my $classfile = "$distbase$under/$class";
-	my @g = glob("$classfile.*");
-	push @g, $classfile if -f $classfile;
-	maint_fatalerror( "found $classfile.* classfiles @g" ) if @g > 1;
+	my $fileinfo = $distclasses->{$class};
+	next unless defined $fileinfo;
 
-	next if @g==0;
-	my %newprops = maint_parseproperties( $g[0] );
-	$g[0] =~ s|^$distbase||;
+	my $filename = $fileinfo->{FILE} // $class;
+	my $fprops   = $fileinfo->{FPROPS};
+	#maint_warning( "distchoose: class=$class, filename=$filename, fprops=".Dumper($fprops) );
+
+	my $resultfilename = "$under/$filename";
 	my $myprops = { %$props };
-	@$myprops{keys %newprops} = values %newprops;
+	@$myprops{keys %$fprops} = values %$fprops;
 
 	# sanitise: remove any unknown properties
 	foreach my $k (keys %$myprops)
@@ -258,7 +302,7 @@ sub maint_distchoose ($$$)
 	    delete $myprops->{$k} unless $permittedprop{$k};
 	}
 
-	return ( $g[0], $myprops );
+	return ( $resultfilename, $myprops );
     }
     return ( undef, undef );
 }

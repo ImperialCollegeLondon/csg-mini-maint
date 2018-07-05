@@ -80,30 +80,36 @@ foreach my $df (@distdata)
 {
 	my $srcdir = $df->{PATH};
 	my $props = $df->{PROPS};
+	my $distclasses = $df->{CLASSFILES};
 
 	#print "debug: srcdir=$srcdir\n";
 
 	my( $srcfilename, $newprops ) =
-		maint_distchoose( $distbase, $srcdir, $props );
+		maint_distchoose( $distbase, $srcdir, $props, $distclasses );
 
-	my $destdir = "$srcdir";
+	#if( defined $srcfilename )
+	#{
+	#	my $shownew = join( ',', map { "$_=$newprops->{$_}" } sort keys %$newprops );
+	#	print "debug: distchoose results: srcfilename=$srcfilename, newprops=$shownew\n";
+	#}
+
+	my $destdir = $srcdir;
 	my $destfile = "$destroot$destdir";
-
-	my $showprops = join( ',',
-		map { "$_=$props->{$_}" }
-			sort keys %$props );
 
 	#if( $srcdir =~ /nginx/ )
 	#{
 	#	my $str = $srcfilename // "<UNDEF>";
+	# my $showprops = join( ',', map { "$_=$props->{$_}" }
+	# 		sort keys %$props );
+        #
 	#	maint_warning( "looking at $srcdir, found $str, props=$showprops, dest $destfile" );
 	#}
 
 	unless( defined $srcfilename )
 	{
 		# should we "undist" the file?  ie. remove it?
-		my $undist = $props->{undist};
-		if( defined $undist && $undist eq "yes" )
+		my $undist = $props->{undist} // "no";
+		if( $undist eq "yes" )
 		{
 			#print "dedug: not disting $srcdir, undist=$undist\n";
 			#print "dedug: does $destfile exist?\n";
@@ -117,15 +123,14 @@ foreach my $df (@distdata)
 		next;
 	}
 
-	$props = $newprops;
-	$showprops = join( ',',
-		map { "$_=$props->{$_}" }
-			sort keys %$props );
+	# ok, disting a file..
 
-	#die "debug: srcfilename:$srcfilename, properties are ". Dumper($props);
+	$props = $newprops;
 
 	#if( $srcfilename =~ /nginx/ )
 	#{
+	#	$showprops = join( ',',
+	#		map { "$_=$props->{$_}" } sort keys %$props );
 	#	maint_warning( "chosen file $srcfilename, props=$showprops, dest $destfile" );
 	#}
 
