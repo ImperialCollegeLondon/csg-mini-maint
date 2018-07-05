@@ -191,6 +191,7 @@ sub _class_getall ($)
     while( <$infh> )
     {
     	chomp;
+	next if /^#/;
 	my @r = split( /\s*,\s*/, $_ );
 	$r[2] //= 50;
 	next unless $r[0];
