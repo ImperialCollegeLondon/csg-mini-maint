@@ -17,12 +17,8 @@ our @EXPORT    = qw(
 );
 our $VERSION = '0.01';
 
-#use Cwd;
 use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
-use Maint::SafeFile qw(:all);
-use Maint::Util qw(:all);
-use File::Basename;
 
 =head1 NAME
 
