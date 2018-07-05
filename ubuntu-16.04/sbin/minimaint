@@ -101,7 +101,7 @@ sub loadphase1config()
 	$distribution = lc("$lsbid-$lsbrelease");
 	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
 
-	print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
+	#print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
 }
 
 
@@ -224,6 +224,7 @@ BEGIN {
 sub loadphase2config ($)
 {
 	my( $phase2filename ) = @_;
+	print "debug phase2: phase2filename=$phase2filename\n";
 	my $text = read_file( $phase2filename ) ||
 		die "minimaint: can't slurp phase 2 config file $phase2filename\n";
 	my $newconfigdata = decode_json($text);
