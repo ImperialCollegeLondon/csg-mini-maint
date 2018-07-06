@@ -52,6 +52,7 @@ use Maint::HostClass qw(:all);
 use Maint::SafeFile qw(:all);
 use Maint::Choose qw(:all);
 use Maint::DistSupport qw(:all);
+use Maint::Compose qw(:all);
 
 INIT
 {
@@ -67,6 +68,7 @@ INIT
 		Maint::SafeFile->export_to_level(1,   __PACKAGE__, ':all');
 		Maint::Choose->export_to_level(1,     __PACKAGE__, ':all');
 		Maint::DistSupport->export_to_level(1,__PACKAGE__, ':all');
+		Maint::Compose->export_to_level(1,    __PACKAGE__, ':all');
 	}
 }
 
