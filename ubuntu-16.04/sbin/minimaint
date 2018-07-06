@@ -61,7 +61,7 @@ our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $cachedir;			# where to store local src eg /var/cache/minimaint
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
-#my $git = "/usr/bin/git";
+my $git = "/usr/bin/git";
 
 # Computed later
 our $configdir;
@@ -156,8 +156,6 @@ sub loadcache ($$)
 
 	-d $repodest || die "Cannot create directory $repodest\n";
 	-w $repodest || die "directory $repodest not writable!\n";
-
-	my $git = "/usr/bin/git";
 
 	# If we don't have any local version of the repository at all,
 	# create a new clone.
@@ -269,8 +267,8 @@ sub runmaintscript
 	my $nocrashonerr = 1; # If we're in install mode, we do want to crash
 	$nocrashonerr = 1 if maint_testmode('install');
 
-	# DCW.. now, force the maint script to read config from cachedir
-	$ENV{MM_CONFIG_DIR} = "$cachedir/config";
+	# DCW.. now, force the maint script to read config from right place
+	$ENV{MM_CONFIG_DIR} = $configdir;
 	maint_debug( "Running: $perlbin -I $perllibpath $scriptpath @args" );
 	maint_runcmd([$perlbin, '-I', $perllibpath, $scriptpath, @args],
 		undef, $nocrashonerr, undef, \*STDOUT, \*STDERR);

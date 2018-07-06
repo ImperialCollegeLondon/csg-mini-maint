@@ -61,8 +61,6 @@ our $lsbrelease;		# which release of Ubuntu (eg 16.04)
 our $cachedir;			# where to store local src eg /var/cache/minimaint
 our $distribution;		# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
 
-#my $git = "/usr/bin/git";
-
 # Computed later
 our $configdir;
 our $maintroot;
