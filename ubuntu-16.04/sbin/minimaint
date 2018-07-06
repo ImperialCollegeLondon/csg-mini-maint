@@ -217,7 +217,6 @@ sub bootstrap()
 	$perllibpath = "$maintroot/$distribution/lib/perl";
 #
 	unshift(@INC, $perllibpath); # Cannot use "use lib" directly
-	unshift(@INC, "/vol/csg/public/users/dcw/git-projects/csg-mini-maint/ubuntu-16.04/lib/perl" );	# DCW.. temp, gross, hack
 	require Maint; import Maint qw(:all);
 }
 

@@ -247,10 +247,10 @@ sub maint_init
 
 	# Write out last-run timestamp.
 	# Create timestamp directory if it doesn't already exist.
-	my $timestampdir = maint_getconfig( "rundir" );
-	mkdir $timestampdir, 0755 unless -d $timestampdir;
+	my $rundir = maint_getconfig( "rundir" );
+	mkdir $rundir, 0755 unless -d $rundir;
 	$scriptname =~ s/\//-/;
-	open( my $outfh, '>', "$timestampdir/$scriptname" );
+	open( my $outfh, '>', "$rundir/$scriptname" );
 	close( $outfh );
 }
 
