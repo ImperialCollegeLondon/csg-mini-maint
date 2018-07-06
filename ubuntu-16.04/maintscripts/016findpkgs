@@ -1,0 +1,23 @@
+#!/usr/bin/perl
+#
+#	016findpkgs: find which packages we should add..
+#
+use strict;
+use warnings;
+
+use Data::Dumper;
+use Maint qw(:all);
+
+maint_init();
+
+my $configdir = maint_getconfigdir();
+my $filename = maint_getconfig( "packagelists" );
+
+my @lines = maint_compose( "$configdir/$filename" );
+
+maint_info( "want following pkgs:" );
+foreach (@lines)
+{
+	maint_info( "$_" );
+}
+maint_exit();
