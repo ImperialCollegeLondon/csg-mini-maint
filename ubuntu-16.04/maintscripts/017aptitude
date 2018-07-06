@@ -13,20 +13,6 @@ our $aptitude = "/usr/bin/aptitude";
 our $aptget = "/usr/bin/apt-get";
 our $ldconfig = "/sbin/ldconfig";
 
-maint_init();
-
-my $configdir = maint_getconfigdir();
-my $filename = maint_getconfig( "packagelists" );
-
-my @lines = maint_compose( "$configdir/$filename" );
-
-maint_info( "want following pkgs:" );
-foreach (@lines)
-{
-	maint_info( "$_" );
-}
-maint_exit();
-
 
 # --- Subroutine definitions --- #
 
@@ -128,7 +114,10 @@ sub display_nth
 	}
 }
 
-maint_init();       
+maint_init();
+
+my $configdir = maint_getconfigdir();
+my $filename = maint_getconfig( "packagelists" );
 
 our $stderr;
 
@@ -166,9 +155,15 @@ if( $mode eq "install" && -e "/usr/local/lib/libeatmydata.so" )
 	$ENV{"LD_PRELOAD"} = '/usr/local/lib/libeatmydata.so';
 }
 
-# Work out the package-set that we want to install.
-my @packages = maint_compose('config');
-maint_debug( "Package install-list: " . join(", ", @packages));
+my @packages = maint_compose( "$configdir/$filename" );
+
+#maint_info( "Package install-list: " . join(", ", @packages));
+
+maint_info( "want following pkgs:" );
+foreach (@packages)
+{
+	maint_info( "$_" );
+}
 
 $ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
 
