@@ -1,0 +1,251 @@
+#!/usr/bin/perl
+#
+#	017aptitude: install whatever packages we want
+#
+use strict;
+use warnings;
+
+use Data::Dumper;
+use Maint qw(:all);
+#use Maint::Run;
+
+maint_init();
+
+my $configdir = maint_getconfigdir();
+my $filename = maint_getconfig( "packagelists" );
+
+my @lines = maint_compose( "$configdir/$filename" );
+
+maint_info( "want following pkgs:" );
+foreach (@lines)
+{
+	maint_info( "$_" );
+}
+maint_exit();
+
+
+# --- Subroutine definitions --- #
+
+# This function is called for every chunk of output from aptitude
+# during the main install phase.
+sub display_nth
+{
+	my $arg = shift;
+	our $state_fetching ||= 0;
+	our $packagetotal ||= 0;
+	our $fetchedcount ||= 0;
+	our $count ||= 0;
+	our $pctreported ||= 0;
+
+	maint_debug( "Snippet (count: $count) (packagetotal: $packagetotal): $arg");
+
+	if( $arg =~ /No candidate version found for (\S+)/m )
+	{
+		maint_warning( "Want to install $1, but no candidate package available.");
+	}
+	if( $arg =~ /(\S+) \[Not Installed\]/ )
+	{
+		maint_warning( "Unable to install $1, pre-requisites not met.");
+	}
+	if( $arg =~ /Unable to resolve dependencies!/m )
+	{
+		maint_warning( "Dependency resolution failure!  Package system aborted!");
+	}
+	# Aptitude reporting a generic error, forward to terminal.
+	if( $arg =~ /^E: (.*)/)
+	{
+		maint_warning( $1 );
+	}
+	if( $arg =~ /(\d+) packages upgraded, (\d+) newly installed, (\d+) to remove and (\d+) not upgraded/m )
+	{
+		$packagetotal = $1 + $2;
+		$count = 0;
+		$pctreported = 0;
+		$state_fetching = 0;
+		maint_info( "Installing $2 / Upgrading $1 / Removing $3 packages");
+	}
+	if( $arg =~ /^Need to get (\d+) (\S+)\//m )
+	{
+		# If aptitude tells us we need to fetch packages from elsewhere,
+		# report the amount of data we need to fetch to the reader.
+		# This helps set expectations accordingly.
+		my( $count, $unit ) = ($1, $2);
+		maint_info( "Prefetching $count $unit") if $count > 0;
+	}
+	if( !$state_fetching && $arg =~ /^Get:\d+/m )
+	{
+		# We've started fetching packages.
+		$state_fetching = 1;
+		maint_info( "Fetching packages from repositories...");
+	}
+	if( $arg =~ /^Get:(\d+)/m )
+	{
+		# Report every 50 packages fetched.
+		$fetchedcount = $1;
+		my @lines = split(/\n/, $arg);
+		foreach (@lines)
+		{
+			$fetchedcount = $1 if /^Get:(\d+)/;
+		}
+
+		maint_info( "$fetchedcount") if $fetchedcount % 50 == 0;
+	}
+	elsif( $arg =~ /^Fetched (\d+ \S+) in (\d+\S+) \(\d+ \S+\)/ )
+	{
+		# Package fetching complete.
+		my( $_count, $_time, $_rate ) = ($1, $2, $3);
+		my $inner = defined $_rate ? " @ $_rate" : "";
+		maint_info( "$fetchedcount packages fetched ($1 in $2$inner).  Beginning install phase...");
+	}
+	elsif( $packagetotal > 0 && $arg =~ /^(Setting up|Unpacking)\s+(\S+)/ )
+	{
+		# Count the number of 'Setting up' or 'Unpacking' lines which appear, as
+		# a single snippet may contain more than one.
+		my @lines = split(/\n/, $arg);
+		# DCW isn't this just
+		# my $processed = grep { /^(Setting up|Unpacking)\s\S+/ } @lines;
+		my $processed = 0;
+		foreach (@lines)
+		{
+			$processed++ if /^(Setting up|Unpacking)\s(\S+)/;
+		}
+
+		# Increment our package count.
+		$count += $processed;
+
+		# Work out the percentage of packages set up so far.
+		# If we've crossed a 5% threshold, log that fact.
+		my $pct = ($count / ($packagetotal * 2)) * 100;
+		while( $pct >= $pctreported + 5 )
+		{
+			maint_info( $pctreported + 5 . "%");
+			$pctreported += 5;
+		}
+	}
+}
+
+maint_init();       
+
+our $stderr;
+
+# Calculate the set of classes we're in.
+my @sysclasses = maint_listclasses();
+my %inclass = map { $_ => 1 } @sysclasses;
+my $mode = maint_getattr("mode");
+
+# DCW: --- This is all entirely DoC specific -- we need to move it out of
+# here, but to WHERE?   site/AptCheck.pm in the config dir?
+
+# exclude lecture theatre machines from running aptitude between these hours
+my $theatre_exclude_from = 9;
+my $theatre_exclude_to = 17;
+
+# If we are both in class THEATRE and it's currently during standard
+# hours, ABORT so that we don't disturb any teaching in progress.
+my $hour = (localtime(time()))[2];
+if( $inclass{THEATRE}
+&&  $hour >= $theatre_exclude_from
+&&  $hour <= $theatre_exclude_to 
+&& $mode ne "install")
+{
+	maint_info(
+		"Will not run aptitude on THEATRE machines during $theatre_exclude_from:00..$theatre_exclude_to:59" );
+	maint_exit(0);
+	exit(0);
+}
+
+# If we're in install-mode, and if /usr/local/lib/libeatmydata.so exists,
+# add it to LD_PRELOAD.  This has the effect of disabling all fsync and
+# related calls, thus speeding up installation significantly.
+if( $mode eq "install" && -e "/usr/local/lib/libeatmydata.so" )
+{
+	maint_info( "Install-mode: disabling fsync and friends.");
+	$ENV{"LD_PRELOAD"} = '/usr/local/lib/libeatmydata.so';
+}
+
+# Work out the package-set that we want to install.
+my @packages = maint_compose('config');
+maint_debug( "Package install-list: " . join(", ", @packages));
+
+$ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
+
+my $dpkg = "/usr/bin/dpkg";
+my $aptitude = "/usr/bin/aptitude";
+my $aptget = "/usr/bin/apt-get";
+my $ldconfig = "/sbin/ldconfig";
+
+maint_info( "Forcing dpkg configuration actions");
+maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef'], 0, LOG_WARNING);
+
+maint_info( "Updating package caches");
+#maint_runcmd( [ $aptitude, '-v', '-y', 'update'], 0, LOG_WARNING);
+#EXPERIMENTAL: use apt-get update instead of aptitude update
+maint_runcmd( [ $aptget, '-y', 'update'], 0, LOG_WARNING);
+
+maint_info( "Forcing install");
+maint_runcmd( [ $aptitude, '-o', 'Dpkg::Options::=--force-confdef', '-v', '-y', '-f', 'install'], 0, LOG_WARNING);
+
+maint_info( "Forcing dpkg configuration actions (again, just in case..)");
+maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef'], 0, LOG_WARNING);
+
+maint_info( "Dist-upgrading");
+$stderr = "Hello.";
+maint_runcmd1( [ $aptitude, '-v', '-y', '-o' , 'Dpkg::Options::=--force-confdef', 'dist-upgrade'], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
+open(OUT, ">/tmp/aptitude.log");
+print OUT $stderr;
+close(OUT);
+
+# DCW - is this really necessary?
+maint_info( "Upgrading");
+$stderr = "Hello.";
+maint_runcmd1( [ $aptitude, '-v', '-y', '-o' , 'Dpkg::Options::=--force-confdef', 'upgrade'], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
+open(OUT, ">/tmp/aptitude2.log");
+print OUT $stderr;
+close(OUT);
+
+maint_info( "Applying host package policy");
+$stderr = "Hello.";
+
+# separate the packages to be removed from those to install
+my @removepackages = grep { /\_$/ } @packages;
+@packages = grep { ! /\_$/ } @packages;
+
+# unwanted packages trump wanted packages; remove unwanted from install list
+my %removehash = map{ $_=>1 } @removepackages;
+@packages = grep { !defined $removehash{$_."_"} } @packages;
+
+# get currently installed packages
+my @installedpackages = `$aptitude search -F '%p' '~i' --disable-columns`;
+chomp @installedpackages;
+my %installedpackages = map { $_=>1 } @installedpackages;
+
+# get packages that are wanted and not currently installed
+@packages = grep { !defined $installedpackages{$_} } @packages;
+
+# get packages that are not wanted and are currently installed
+@removepackages = grep
+	{ defined $installedpackages{substr($_, 0, -1)} } @removepackages;
+
+# - process packages to remove 
+if( @removepackages > 0 )
+{
+	maint_runcmd( [ $aptitude, '-y', '-v', '--full-resolver', '--log-level=info', '--log-resolver', 'install', @removepackages], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
+}
+
+# - process packages to install
+if( @packages > 0 )
+{
+	maint_runcmd1( [ $aptitude, '-y', '-v', '-f', '-o' , 'Dpkg::Options::=--force-confdef', '--allow-new-installs', '--full-resolver', '--log-level=info', '--log-resolver', 'install', @packages], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
+	open(OUT, ">/tmp/aptitude3.log");
+	print OUT $stderr;
+	close(OUT);
+}
+
+
+maint_info( "dpkg configuring, one more time..");
+maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef']);
+
+maint_info( "Running ldconfig");
+maint_runcmd( [ $ldconfig ]);
+
+maint_exit();
