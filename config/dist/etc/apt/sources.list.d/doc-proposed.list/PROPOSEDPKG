@@ -1,3 +1,0 @@
-# A list file for a DoC mirror of the Ubuntu Xenial proposed package repo
-deb http://apt.doc.ic.ac.uk/ubuntu/xenial/aptly/public/xenial-proposed/ xenial-proposed main
-deb-src http://apt.doc.ic.ac.uk/ubuntu/xenial/aptly/public/xenial-proposed/ xenial-proposed main

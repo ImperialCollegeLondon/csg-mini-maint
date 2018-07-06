@@ -1,9 +1,0 @@
-### THIS FILE IS AUTOMATICALLY CONFIGURED ###
-# CSG have commented this line out so that Google Chrome is not upgraded
-# unexpectedly.  Furthermore, enabling this option can cause delays
-# when 'apt-get update' or 'aptitude update' is called.  If you want to
-# enable this option, you will need root privileges on your machine:
-# 1) ksu to root.
-# 2) touch /etc/apt/sources.list.d/google-chrome.list-special
-# 3) uncomment the line below.
-# deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main

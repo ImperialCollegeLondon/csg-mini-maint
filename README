@@ -26,6 +26,7 @@ The core principles must be:
   tree, the apt package lists, the database config files etc etc.  Store
   this in an /etc/maint directory, getting it from a separate git repo,
   not so public, but accessible to DoC machines outside of 146.169:-)
+  Find one such config dir in ../csg-mini-maint-dcw-config
 
 - To replace db-admin, needs more thought, on one level this is more DoC
   specific information, specifically a set of users, groups (and members),
@@ -36,7 +37,8 @@ The core principles must be:
   RESTful API, in JSON format. Alternatively, it could be automatically
   generated (in our case FROM db-admin) as a small number of JSON files
   every N minutes (say once an hour), automatically added to the config repo
-  and pushed, making it live.
+  and pushed, making it live.  For now, ../csg-mini-maint-dcw-config contains
+  a hostclass file containing some made up example config info.
 
 The basic idea will be to COPY small bits of maint and it's libraries in
 here, separate out the config from the source code, delete as much as
@@ -48,8 +50,11 @@ INITIAL GOALS:
 0). maint hello  - achieved Monday 2nd July, with approx 4200 lines of Perl
 
 1). maint dist   - achieved Tuesday 3rd July, now approx 4700 lines.
+		 - reengineered and fully integrated undis logic Thurs 5th,
+		   now approx 5000 lines
 
-2). maint aptitude
+2). maint aptitude - ported maint_compose and did initial 016findpkgs to
+		     produce the list of desired pkgs, Thurs 5th July.
 
 3). maint useraccounts
 
