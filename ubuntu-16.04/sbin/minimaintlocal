@@ -280,7 +280,7 @@ sub findscripts()
 
 # --- Main program ----------------------------------------------------------
 
-$configdir = "$maintroot/config";
+#DCW $configdir = "$maintroot/config";
 my $phase2filename = "$configdir/phase2";
 loadphase2config( $phase2filename );
 
