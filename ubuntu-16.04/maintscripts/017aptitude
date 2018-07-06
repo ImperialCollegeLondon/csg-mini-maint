@@ -7,7 +7,11 @@ use warnings;
 
 use Data::Dumper;
 use Maint qw(:all);
-#use Maint::Run;
+
+our $dpkg = "/usr/bin/dpkg";
+our $aptitude = "/usr/bin/aptitude";
+our $aptget = "/usr/bin/apt-get";
+our $ldconfig = "/sbin/ldconfig";
 
 maint_init();
 
@@ -151,7 +155,6 @@ if( $inclass{THEATRE}
 	maint_info(
 		"Will not run aptitude on THEATRE machines during $theatre_exclude_from:00..$theatre_exclude_to:59" );
 	maint_exit(0);
-	exit(0);
 }
 
 # If we're in install-mode, and if /usr/local/lib/libeatmydata.so exists,
@@ -168,11 +171,6 @@ my @packages = maint_compose('config');
 maint_debug( "Package install-list: " . join(", ", @packages));
 
 $ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
-
-my $dpkg = "/usr/bin/dpkg";
-my $aptitude = "/usr/bin/aptitude";
-my $aptget = "/usr/bin/apt-get";
-my $ldconfig = "/sbin/ldconfig";
 
 maint_info( "Forcing dpkg configuration actions");
 maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef'], 0, LOG_WARNING);
@@ -204,11 +202,12 @@ print OUT $stderr;
 close(OUT);
 
 maint_info( "Applying host package policy");
-$stderr = "Hello.";
 
 # separate the packages to be removed from those to install
 my @removepackages = grep { /\_$/ } @packages;
 @packages = grep { ! /\_$/ } @packages;
+
+maint_info( "Hostpp says: remove @removepackages" );
 
 # unwanted packages trump wanted packages; remove unwanted from install list
 my %removehash = map{ $_=>1 } @removepackages;
@@ -220,11 +219,17 @@ chomp @installedpackages;
 my %installedpackages = map { $_=>1 } @installedpackages;
 
 # get packages that are wanted and not currently installed
-@packages = grep { !defined $installedpackages{$_} } @packages;
+@packages = grep { ! $installedpackages{$_} } @packages;
+
+maint_info( "Hostpp: will install @packages" );
 
 # get packages that are not wanted and are currently installed
 @removepackages = grep
-	{ defined $installedpackages{substr($_, 0, -1)} } @removepackages;
+	{ $installedpackages{substr($_, 0, -1)} } @removepackages;
+
+maint_info( "Hostpp: will remove @removepackages" );
+
+$stderr = "Hello.";
 
 # - process packages to remove 
 if( @removepackages > 0 )
@@ -240,7 +245,6 @@ if( @packages > 0 )
 	print OUT $stderr;
 	close(OUT);
 }
-
 
 maint_info( "dpkg configuring, one more time..");
 maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef']);
