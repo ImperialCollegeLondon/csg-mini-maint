@@ -122,8 +122,7 @@ my $filename = maint_getconfig( "packagelists" );
 our $stderr;
 
 # Calculate the set of classes we're in.
-my @sysclasses = maint_listclasses();
-my %inclass = map { $_ => 1 } @sysclasses;
+my %inclass = map { $_ => 1 } maint_listclasses();
 my $mode = maint_getattr("mode");
 
 # DCW: --- This is all entirely DoC specific -- we need to move it out of
@@ -157,13 +156,7 @@ if( $mode eq "install" && -e "/usr/local/lib/libeatmydata.so" )
 
 my @packages = maint_compose( "$configdir/$filename" );
 
-#maint_info( "Package install-list: " . join(", ", @packages));
-
-maint_info( "want following pkgs:" );
-foreach (@packages)
-{
-	maint_info( "$_" );
-}
+maint_info( "want following pkgs: " . join(", ", @packages) );
 
 $ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
 
@@ -200,13 +193,16 @@ maint_info( "Applying host package policy");
 
 # separate the packages to be removed from those to install
 my @removepackages = grep { /\_$/ } @packages;
-@packages = grep { ! /\_$/ } @packages;
 
-maint_info( "Hostpp says: remove @removepackages" );
+if( @removepackages )
+{
+	maint_info( "Hostpp says: remove @removepackages" );
 
-# unwanted packages trump wanted packages; remove unwanted from install list
-my %removehash = map{ $_=>1 } @removepackages;
-@packages = grep { !defined $removehash{$_."_"} } @packages;
+	@packages = grep { ! /\_$/ } @packages;
+	# unwanted packages trump wanted packages; remove unwanted from @p
+	my %removehash = map{ $_=>1 } @removepackages;
+	@packages = grep { !defined $removehash{$_."_"} } @packages;
+}
 
 # get currently installed packages
 my @installedpackages = `$aptitude search -F '%p' '~i' --disable-columns`;
@@ -216,24 +212,24 @@ my %installedpackages = map { $_=>1 } @installedpackages;
 # get packages that are wanted and not currently installed
 @packages = grep { ! $installedpackages{$_} } @packages;
 
-maint_info( "Hostpp: will install @packages" );
+maint_info( "Hostpp: will install @packages" ) if @packages;
 
 # get packages that are not wanted and are currently installed
 @removepackages = grep
 	{ $installedpackages{substr($_, 0, -1)} } @removepackages;
 
-maint_info( "Hostpp: will remove @removepackages" );
+maint_info( "Hostpp: will remove @removepackages" ) if @removepackages;
 
 $stderr = "Hello.";
 
 # - process packages to remove 
-if( @removepackages > 0 )
+if( @removepackages )
 {
 	maint_runcmd( [ $aptitude, '-y', '-v', '--full-resolver', '--log-level=info', '--log-resolver', 'install', @removepackages], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
 }
 
 # - process packages to install
-if( @packages > 0 )
+if( @packages )
 {
 	maint_runcmd1( [ $aptitude, '-y', '-v', '-f', '-o' , 'Dpkg::Options::=--force-confdef', '--allow-new-installs', '--full-resolver', '--log-level=info', '--log-resolver', 'install', @packages], 0, LOG_DEBUG, undef, \&display_nth, \$stderr);
 	open(OUT, ">/tmp/aptitude3.log");
