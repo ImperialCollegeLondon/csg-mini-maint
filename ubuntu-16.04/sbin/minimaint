@@ -251,6 +251,33 @@ sub loadphase2config ($)
 
 
 #
+# refreshconfigdir( $configdir );
+#	Refresh our configdir from upstream via a "git pull",
+#	(if it's git controlled)
+#
+sub refreshconfigdir ($)
+{
+	my( $configdir ) = @_;
+
+	-d $configdir || die "minimaint: no config directory $configdir\n";
+	-w $configdir || die "directory $configdir not writable!\n";
+
+	my $git = "/usr/bin/git";
+
+	# If we don't have any local version of the repository at all,
+	# create a new clone.
+
+	# Update the current repository using a simple fast-forward strategy.
+	chdir($configdir);
+	if( -d ".git" )
+	{
+		system("$git pull --quiet") == 0 ||
+			maint_warning( "Git pull in $configdir failed with !$" );
+	}
+}
+
+
+#
 # runmaintscript( $scriptpath, @args );
 #	Run a specific named maint-script as identified by it's script
 #	path and name, with the given args
@@ -391,8 +418,13 @@ maint_debug( "Configdir=$cd, hostclass:source=$chs, hostclass:file=$chf" );
 # Reload cached class data
 maint_lockname($scriptlock);
 maint_fatalerror( 'Cannot get lock, aborting' ) unless maint_setlock();
+
 maint_reloadclasses(1);
 @classlist = maint_listclasses();
+
+# and config dir (if git controlled)
+refreshconfigdir( $configdir );
+
 maint_clearlock();
 
 # Run desired scripts (if allowed)
