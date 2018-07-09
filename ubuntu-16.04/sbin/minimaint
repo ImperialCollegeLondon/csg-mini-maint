@@ -272,7 +272,7 @@ sub refreshconfigdir ($)
 	if( -d ".git" )
 	{
 		system("$git pull --quiet") == 0 ||
-			maint_warning( "Git pull in $configdir failed with !$" );
+			maint_warning( "Git pull in $configdir failed with $!" );
 	}
 }
 
