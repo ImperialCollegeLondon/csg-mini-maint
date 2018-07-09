@@ -52,7 +52,9 @@ sub display_nth
 		$count = 0;
 		$pctreported = 0;
 		$state_fetching = 0;
-		maint_info( "Installing $2 / Upgrading $1 / Removing $3 packages");
+		maint_info( "Installing $2" ) if $2;
+		maint_info( "Upgrading $1" ) if $1;
+		maint_info( "Removing $3 packages") if $3;
 	}
 	if( $arg =~ /^Need to get (\d+) (\S+)\//m )
 	{
@@ -72,6 +74,8 @@ sub display_nth
 	{
 		# Report every 50 packages fetched.
 		$fetchedcount = $1;
+		# DCW isn't this just
+		# $fetchedcount = $1 if $arg =~ /^Get:(\d+)/m; ???
 		my @lines = split(/\n/, $arg);
 		foreach (@lines)
 		{
@@ -85,7 +89,7 @@ sub display_nth
 		# Package fetching complete.
 		my( $_count, $_time, $_rate ) = ($1, $2, $3);
 		my $inner = defined $_rate ? " @ $_rate" : "";
-		maint_info( "$fetchedcount packages fetched ($1 in $2$inner).  Beginning install phase...");
+		maint_info( "$fetchedcount packages fetched ($_count in $_time$inner).  Beginning install phase...");
 	}
 	elsif( $packagetotal > 0 && $arg =~ /^(Setting up|Unpacking)\s+(\S+)/ )
 	{
@@ -93,12 +97,12 @@ sub display_nth
 		# a single snippet may contain more than one.
 		my @lines = split(/\n/, $arg);
 		# DCW isn't this just
-		# my $processed = grep { /^(Setting up|Unpacking)\s\S+/ } @lines;
-		my $processed = 0;
-		foreach (@lines)
-		{
-			$processed++ if /^(Setting up|Unpacking)\s(\S+)/;
-		}
+		my $processed = grep { /^(Setting up|Unpacking)\s\S+/ } @lines;
+		#my $processed = 0;
+		#foreach (@lines)
+		#{
+		#	$processed++ if /^(Setting up|Unpacking)\s(\S+)/;
+		#}
 
 		# Increment our package count.
 		$count += $processed;
