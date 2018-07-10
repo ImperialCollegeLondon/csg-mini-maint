@@ -52,9 +52,11 @@ sub display_nth
 		$count = 0;
 		$pctreported = 0;
 		$state_fetching = 0;
-		maint_info( "Installing $2" ) if $2;
-		maint_info( "Upgrading $1" ) if $1;
-		maint_info( "Removing $3 packages") if $3;
+		maint_info( "Installing $2 / Upgrading $1 / Removing $3 ".
+			    "packages") if $1+$2+$3;
+		#maint_info( "Installing $2" ) if $2;
+		#maint_info( "Upgrading $1" ) if $1;
+		#maint_info( "Removing $3 packages") if $3;
 	}
 	if( $arg =~ /^Need to get (\d+) (\S+)\//m )
 	{
@@ -75,12 +77,12 @@ sub display_nth
 		# Report every 50 packages fetched.
 		$fetchedcount = $1;
 		# DCW isn't this just
-		# $fetchedcount = $1 if $arg =~ /^Get:(\d+)/m; ???
-		my @lines = split(/\n/, $arg);
-		foreach (@lines)
-		{
-			$fetchedcount = $1 if /^Get:(\d+)/;
-		}
+		$fetchedcount = $1 if $arg =~ /^Get:(\d+)/m;
+		#my @lines = split(/\n/, $arg);
+		#foreach (@lines)
+		#{
+		#	$fetchedcount = $1 if /^Get:(\d+)/;
+		#}
 
 		maint_info( "$fetchedcount") if $fetchedcount % 50 == 0;
 	}
@@ -89,20 +91,15 @@ sub display_nth
 		# Package fetching complete.
 		my( $_count, $_time, $_rate ) = ($1, $2, $3);
 		my $inner = defined $_rate ? " @ $_rate" : "";
-		maint_info( "$fetchedcount packages fetched ($_count in $_time$inner).  Beginning install phase...");
+		maint_info( "$fetchedcount packages fetched ($_count in ".
+			    "$_time$inner).  Beginning install phase...");
 	}
 	elsif( $packagetotal > 0 && $arg =~ /^(Setting up|Unpacking)\s+(\S+)/ )
 	{
-		# Count the number of 'Setting up' or 'Unpacking' lines which appear, as
+		# Count the number of 'Setting up' or 'Unpacking' lines, as
 		# a single snippet may contain more than one.
 		my @lines = split(/\n/, $arg);
-		# DCW isn't this just
 		my $processed = grep { /^(Setting up|Unpacking)\s\S+/ } @lines;
-		#my $processed = 0;
-		#foreach (@lines)
-		#{
-		#	$processed++ if /^(Setting up|Unpacking)\s(\S+)/;
-		#}
 
 		# Increment our package count.
 		$count += $processed;
@@ -118,6 +115,35 @@ sub display_nth
 	}
 }
 
+
+# move this to WHERE?   site/AptCheck.pm in the config dir?
+#
+# my $mesg = site_aptitude_check( $mode, %inclass );
+#	Perform site specific aptitude checks, given the $mode and
+#	%inclass (the set of which hostclasses this host is in).
+#	Returns a non-empty message if we should SKIP running maint aptitude
+#	(the message will be printed with maint_info());
+#	Returns undef if it's ok to carry on.
+#
+sub site_aptitude_check ($%)
+{
+	my( $mode, %inclass ) = @_;
+
+	# If we are both in class THEATRE and it's currently during standard
+	# hours, skip so that we don't disturb any teaching in progress.
+	my $hour = (localtime(time()))[2];
+	if( $inclass{THEATRE}
+	&&  $hour >= 9
+	&&  $hour <= 18
+	&& $mode ne "install")
+	{
+		return "Will not run maint aptitude on THEATRE machines ".
+			"during 09:00..18:59";
+	}
+	return undef;
+}
+
+
 maint_init();
 
 my $configdir = maint_getconfigdir();
@@ -129,24 +155,11 @@ our $stderr;
 my %inclass = map { $_ => 1 } maint_listclasses();
 my $mode = maint_getattr("mode");
 
-# DCW: --- This is all entirely DoC specific -- we need to move it out of
-# here, but to WHERE?   site/AptCheck.pm in the config dir?
-
-# exclude lecture theatre machines from running aptitude between these hours
-my $theatre_exclude_from = 9;
-my $theatre_exclude_to = 17;
-
-# If we are both in class THEATRE and it's currently during standard
-# hours, ABORT so that we don't disturb any teaching in progress.
-my $hour = (localtime(time()))[2];
-if( $inclass{THEATRE}
-&&  $hour >= $theatre_exclude_from
-&&  $hour <= $theatre_exclude_to 
-&& $mode ne "install")
+my $skipmsg = site_aptitude_check( $mode, %inclass );
+if( defined $skipmsg )
 {
-	maint_info(
-		"Will not run aptitude on THEATRE machines during $theatre_exclude_from:00..$theatre_exclude_to:59" );
-	maint_exit(0);
+	maint_info( $skipmsg );
+	maint_exit();
 }
 
 # If we're in install-mode, and if /usr/local/lib/libeatmydata.so exists,
