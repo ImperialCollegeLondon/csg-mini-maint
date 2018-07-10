@@ -561,8 +561,6 @@ sub maint_getsiteusers
     return ( $usersbyid, $usersbyname ) if
     	defined $usersbyid && defined $usersbyname;
 
-    my %byname;
-    my %byid;
     unless( $siteusersfilename =~ s/^file:// )
     {
         maint_fatalerror(
@@ -573,23 +571,15 @@ sub maint_getsiteusers
     my $conffile = "$configdir/$siteusersfilename";
     open( my $infh, '<', $conffile )
     	|| maint_fatalerror( "Can't open site user source $conffile" );
-
-    my @siteusers;
     $_ = <$infh>;	# discard first line, headers
+
+    my %byname;
+    my %byid;
     while( <$infh> )
     {
     	chomp;
-	push @siteusers, $_;
-    }
-    close( $infh );
-
-    my $nusers = @siteusers;
-    maint_info( "Found $nusers site users" );
-
-    foreach my $u (@siteusers)
-    {
         my( $uname, $uid, $gid, $gecos, $home, $shell,
-	    $rhomedirserver, $rhomepath, $disabled ) = split(/:/, $u );
+	    $rhomedirserver, $rhomepath, $disabled ) = split(/:/, $_ );
         if( maint_issystemuid($uid) )
         {
             maint_warning( "Skipping system user name=$uname, uid $uid <= ".
@@ -621,7 +611,14 @@ sub maint_getsiteusers
         $byid{$uid}     = \%record;
         $byname{$uname} = \%record;
     }
-    return ( $usersbyid = \%byid, $usersbyname = \%byname );
+    close( $infh );
+
+    my $nusers = keys %byid;
+    maint_info( "Found $nusers site users" );
+
+    $usersbyid = \%byid;
+    $usersbyname = \%byname;
+    return ( $usersbyid, $usersbyname );
 }
 
 
@@ -655,28 +652,15 @@ sub maint_getsitegroups
     my $conffile = "$configdir/$sitegroupsfilename";
     open( my $infh, '<', $conffile ) ||
 	maint_fatalerror( "Can't read site groups file $conffile" );
-    my @sitegroups;
-    while( <$infh> )
-    {
-	chomp;
-	my( $name, $id, $members ) = split( /,/, $_, 3 );
-	push @sitegroups, [ $name, $id, $members ];
-    }
-    close( $infh );
-
-    my $ngroups = @sitegroups;
-    if( $ngroups == 0 )
-    {
-        maint_warning( "Cannot get any site groups" );
-        return( undef, undef );
-    }
-    maint_info( "Found $ngroups site groups" );
+    $_ = <$infh>;	# discard first line, headers
 
     my %byname;
     my %byid;
-    foreach my $grec (@sitegroups)
+
+    while( <$infh> )
     {
-        my( $gname, $gid, $members ) = @$grec;
+	chomp;
+	my( $gname, $gid, $members ) = split( /,/, $_, 3 );
         if( maint_issystemgid($gid) )
         {
             maint_warning( "Skipping system group name=$gname, gid $gid <=".
@@ -696,6 +680,16 @@ sub maint_getsitegroups
         $byid{$gid}     = \%record;
         $byname{$gname} = \%record;
     }
+    close( $infh );
+
+    my $ngroups = keys %byid;
+    if( $ngroups == 0 )
+    {
+        maint_warning( "Cannot get any site groups" );
+        return( undef, undef );
+    }
+    maint_info( "Found $ngroups site groups" );
+
     $groupsbyid   = \%byid;
     $groupsbyname = \%byname;
     return ( $groupsbyid, $groupsbyname );
