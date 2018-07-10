@@ -33,6 +33,7 @@ our $VERSION = '0.01';
 #use List::Util 'first';
 use Maint::Util qw(:all);
 use Maint::Log qw(:all);
+use Maint::ConfigInfo qw(:all);
 #use Maint::HostClass qw(maint_listclasshosts);
 
 our $configdir;
