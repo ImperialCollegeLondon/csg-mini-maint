@@ -499,7 +499,7 @@ sub maint_getgroupsfromfile
         return ( undef, undef );
     }
     my $pfh;
-    unless( open( my $pfh, '<', $file ) )
+    unless( open( $pfh, '<', $file ) )
     {
         maint_warning( "Cannot read file $file" );
         return ( undef, undef );
@@ -603,6 +603,7 @@ sub maint_getsiteusers
 
         $gecos = $uname unless $gecos;
         $shell = '/bin/true' if $disabled;
+	print "debug: $uname, disabled=$disabled, shell=$shell\n";
         $rhomedirserver .= $defaultdomain if
 		defined $rhomedirserver && length($rhomedirserver) &&
                 $rhomedirserver !~ m/\./ && $defaultdomain =~ /\./;
