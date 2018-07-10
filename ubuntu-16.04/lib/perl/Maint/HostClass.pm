@@ -141,7 +141,7 @@ sub _init_config ()
 # my $listofhashes = _class_getall( $source );
 #	Returns an array ref (a list of hashes) of ALL the hostclass data in
 #	the $source.  $source may be "file:filename_in_configdir" or
-#	"db:...." [to be decided later].  On error dies with log_error().
+#	"db:...." [to be decided later].  On error dies with maint_fatalerror().
 #
 #	The returned data looks something like:
 #
@@ -576,7 +576,9 @@ sub maint_listclasshosts ($)
     return sort grep(!$saw{$_}++, @flatmembers);
 }
 
+
 1;
+
 
 =head1 AUTHORS
 

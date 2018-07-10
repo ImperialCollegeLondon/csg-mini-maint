@@ -49,8 +49,9 @@ maint_getconfig
 =head2 B<maint_setconfig( $confdir, $hashref );
 
 Takes a Configuration Data directory $confdir, and a hashref $hashref
-of basic configuration data that we've already read from $confdir/info,
-and store it here, so that other bits of the maint libraries can read it..
+of configuration information that we've already read from $confdir/phase1
+and $confdir/phase2, and store it here, so that other bits of the maint
+libraries can read it..
 
 =cut
 

@@ -389,7 +389,7 @@ maint_pushargs();
 maint_debug( "scripts to run: ". join(' ',@scripts) ) if @scripts;
 
 # Check if root.
-#DCWdie "minimaint: need to run as root\n" if $> != 0;
+maint_fatalerror( "minimaint: need to run as root" ) if $> != 0;
 
 maint_initlog("maint system in $cachedir (production mode)");
 

@@ -1,0 +1,305 @@
+#!/usr/bin/perl
+
+# 010useraccounts: Deal with passwd and group files.
+
+use strict;
+use warnings;
+
+use Maint qw(:all);
+use Maint::UserAccounts qw(:all);
+
+our $configdir;
+our $overrideclass;
+our $overrideshelldir;
+our $passwdfilename;
+our $groupfilename;
+our $autohomesfilename;
+our $siteusersbyid;
+our $siteusersbyname;
+our $sitegroupsbyid;
+our $sitegroupsbyname;
+
+
+maint_init();
+
+_init_config();
+dopasswd();
+dogroup();
+#doamdhomes();
+doautofshomes();
+
+maint_exit();
+
+
+sub _init_config
+{
+	$configdir = maint_getconfigdir();
+	$overrideclass = maint_getconfig( "users:overrideshellclass" );
+	$overrideshelldir = maint_getconfig( "users:overrideshelldir" );
+	$passwdfilename = maint_getconfig( "users:passwdfilename" )
+		// "/etc/passwd";
+	$groupfilename = maint_getconfig( "users:groupfilename" )
+		// "/etc/group";
+	$autohomesfilename = maint_getconfig( "users:autohomesfilename" )
+		// "/etc/auto.homes";
+
+	#	Get the site users, and apply sanity checks.  Sets globals
+	#	$siteusersbyid and $siteusersbyname.
+	( $siteusersbyid, $siteusersbyname ) = maint_getsiteusers();
+	maint_fatalerror( "Cannot get site-users - giving up now") unless
+		defined $siteusersbyid && defined $siteusersbyname;
+
+        # Sanity check that certain core admin users are here
+        foreach my $u (maint_getsanityusers())
+        {
+                maint_fatalerror( "Sanity check failed - missing REQUIRED ".
+			"site user $u")
+				unless exists $siteusersbyname->{$u};
+        }
+
+	# Get the site groups, and apply sanity checks.  Sets globals
+	# $sitegroupsbyid and $sitegroupsbyname.
+	( $sitegroupsbyid, $sitegroupsbyname ) = maint_getsitegroups();
+	maint_fatalerror( "Cannot get site groups - giving up.")
+		unless defined $sitegroupsbyid && defined $sitegroupsbyname;
+
+        # Sanity check that certain core admin groups are here
+        foreach my $g (maint_getsanitygroups())
+        {
+            maint_fatalerror( "Sanity check failed - missing REQUIRED ".
+			"site group $g")
+				unless exists $sitegroupsbyname->{$g};
+        }
+}
+
+
+sub _rewriteshell
+{
+    my( $overrideconfig, $usersbyid ) = @_;
+
+    maint_info( "Overriding some normal users' shells.");
+
+    my @safegroups;
+    my $overrideshell;
+
+    # Read the config file to find the safe groups and build the override shell
+    my %hash = maint_readhash( $overrideconfig );
+    if( $hash{"safe_groups"} )
+    {
+	    @safegroups = split(/\s+/, $hash{"safe_groups"});
+    }
+    if( $hash{"override_shell"} )
+    {
+	    $overrideshell = $hash{"override_shell"};
+    }
+
+    my( $groupsdbbygid, $groupsdbbyname ) = maint_getsitegroups();
+
+    my %safe_gids = ();
+    foreach my $group (@safegroups)
+    {
+        my $grec = $groupsdbbyname->{$group};
+        unless( defined $grec )
+        {
+            maint_warning( "Ignoring unknown safe group: $group");
+            next;
+        }
+
+        $safe_gids{$grec->{gid}} = 1;
+    }
+
+    unless( defined $overrideshell && -f $overrideshell && -x $overrideshell )
+    {
+        maint_warning( "Override shell isn't valid, replacing with /bin/false");
+        $overrideshell = "/bin/false";
+    }
+
+    # Alter the usersbyid hash to reflect the new shell, if appropriate
+    while( my($uid,$val) = each %$usersbyid )
+    {
+        $val->{shell} = $overrideshell unless $safe_gids{$val->{gid}};
+    }
+}
+
+
+sub dopasswd
+{
+	maint_info( "Doing $passwdfilename");
+	my $sysusersbyid={};
+	my $sysusersbyname={};
+	my $usersbyid={};
+	my $usersbyname={};
+
+	my $forcerootin=0;
+
+        my( $passwdfilebyid, $passwdfilebyname ) =
+		maint_getusersfromfile($passwdfilename);
+        maint_fatalerror( "Cannot read from $passwdfilename") unless
+		defined $passwdfilebyid && defined $passwdfilebyname;
+
+	while( my( $uid, $entry ) = each %$passwdfilebyid )
+        {
+            my $uname = $entry->{name};
+            if( maint_issystemuid($uid) )
+            {
+                $sysusersbyid->{$uid}     = $entry;
+                $sysusersbyname->{$uname} = $entry;
+                maint_debug( "Found system acct: $uname=$uid");
+            }
+            else
+            {
+                $usersbyid->{$uid}     = $entry;
+                $usersbyname->{$uname} = $entry;
+            }
+	}
+
+        my $t = keys %$sysusersbyid;
+        if( $t == 0 )
+        {
+            maint_warning( "Argh! no system accounts in the current $passwdfilename");
+        }
+        else
+        {
+            maint_info( "Got $t system accounts from current passwd file");
+        }
+
+        $t = keys %$usersbyid;
+        maint_info( "Got $t existing user accounts from current passwd file");
+
+	unless( exists $sysusersbyid->{0} )
+	{
+		maint_warning( "Argh! root account is missing from current $passwdfilename - adding one in, this machine NEEDS HELP NOW");
+		$sysusersbyid->{0} = {name=>'root', pass=>'x', uid=>0, gid=>0, gecos=>'root', home=>'/root', shell=>'/bin/bash'};
+		$forcerootin=1;
+	}
+
+	# Use the siteusers instead of the from-passwd-file users
+        ($usersbyid, $usersbyname) = ($siteusersbyid, $siteusersbyname);
+
+	# Right, now we need to write a password file out.
+
+	# At this point we check to see if a shell override is requested for
+	# non-system users, if we've been configured to do that at all
+	if( defined $overrideclass && maint_isinclass( $overrideclass ) )
+	{
+	    my $overrideconfig = maint_choose( "$configdir/$overrideshelldir" );
+	    if( defined $overrideconfig )
+	    {
+	        _rewriteshell( $overrideconfig, $usersbyid );
+	    }
+	    else
+	    {
+	        maint_warning( "Machine in $overrideclass class, ".
+			       "but no configuration in $overrideconfig.");
+	    }
+	}
+
+	my $pwcontents = maint_composepasswd($sysusersbyid);
+	$pwcontents .= maint_composepasswd($usersbyid);
+
+	my( $fd, $fh ) = maint_safeopen( $passwdfilename );
+	maint_fatalerror( "Cannot safe_open $passwdfilename" )
+		unless defined $fd;
+	print $fd $pwcontents;
+	maint_safeclose($fh);
+	maint_info( "Updated $passwdfilename");
+}
+
+
+sub dogroup
+{
+	maint_info( "Doing $groupfilename");
+	my $sysgroupsbyid={};
+	my $sysgroupsbyname={};
+	my $groupsbyid={};
+	my $groupsbyname={};
+
+	my $forcerootin=0;
+
+        my( $groupfilebyid, $groupfilebyname ) =
+		maint_getgroupsfromfile($groupfilename);
+        maint_fatalerror( "Cannot read from $groupfilename")
+		unless defined $groupfilebyid && defined $groupfilebyname;
+
+        foreach my $gid (keys %$groupfilebyid)
+        {
+            my $gname = $groupfilebyid->{$gid}{name};
+
+            if( maint_issystemgid($gid) )
+            {
+                $sysgroupsbyid->{$gid} = $groupfilebyid->{$gid};
+                $sysgroupsbyname->{$gname} = $groupfilebyid->{$gid};
+                maint_debug( "Found system group: $gname=$gid");
+            }
+            else
+            {
+                $groupsbyid->{$gid} = $groupfilebyid->{$gid};
+                $groupsbyname->{$gid} = $groupfilebyid->{$gid};
+            }
+        }
+
+        my $t = keys %$sysgroupsbyid;
+        if( $t == 0 )
+        {
+            maint_warning( "Argh! There are no system groups in the current ".
+	    	"$groupfilename, this machine NEEDS HELP NOW");
+        }
+        else
+        {
+            maint_info( "Got $t system groups from current group file" );
+        }
+
+        $t = keys %$groupsbyid;
+        maint_info( "Got $t existing user groups from current group file" );
+
+	unless( exists $sysgroupsbyid->{0} )
+	{
+		maint_warning( "Argh! root group is missing from current ".
+			"$groupfilename - adding one, this machine NEEDS HELP NOW");
+		$sysgroupsbyid->{0} = {name=>'root', pass=>'x', gid=>0, userlist=>''};
+		$forcerootin=1;
+	}
+
+
+	# replace groups from file with site groups
+        ($groupsbyid, $groupsbyname) = ($sitegroupsbyid, $sitegroupsbyname);
+
+	# Right, if we're still alive by this stage we need to write something.
+
+	my $grpcontents = maint_composegroup($sysgroupsbyid);
+	$grpcontents .= maint_composegroup($groupsbyid);
+
+	my ($fd, $fh) = maint_safeopen( $groupfilename );
+	maint_fatalerror( "Cannot safe_open $groupfilename") unless defined $fd;
+	print $fd $grpcontents;
+	maint_safeclose($fh);
+	maint_info( "Updated $groupfilename");
+}
+
+
+sub doamdhomes
+{
+    maint_info( "Doing /etc/amd.homes");
+
+    my $contents = maint_composeamd($siteusersbyid);
+
+    my ($fd, $fh) = maint_safeopen('/etc/amd.homes');
+    maint_fatalerror( 'Cannot safe_open /etc/amd.homes') unless defined $fd;
+    print $fd $contents;
+    maint_safeclose($fh);
+    maint_info( "Updated /etc/amd.homes");
+}
+
+
+sub doautofshomes
+{
+    maint_info( "Doing /etc/auto.homes");
+
+    my $contents = maint_composeautofs($siteusersbyid);
+
+    my ($fd, $fh) = maint_safeopen('/etc/auto.homes');
+    maint_fatalerror( 'Cannot safe_open /etc/auto.homes') unless defined $fd;
+    print $fd $contents;
+    maint_safeclose($fh);
+    maint_info( "Updated /etc/auto.homes");
+}
