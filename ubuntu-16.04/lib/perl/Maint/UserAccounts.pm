@@ -589,7 +589,7 @@ sub maint_getsiteusers
     foreach my $u (@siteusers)
     {
         my( $uname, $uid, $gid, $gecos, $home, $shell,
-	    $rhomedirserver, $rhomepath, $disabled ) = split(/,/, $u );
+	    $rhomedirserver, $rhomepath, $disabled ) = split(/:/, $u );
         if( maint_issystemuid($uid) )
         {
             maint_warning( "Skipping system user name=$uname, uid $uid <= ".
