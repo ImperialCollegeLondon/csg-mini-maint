@@ -39,6 +39,8 @@ use Maint::ConfigInfo qw(:all);
 our $configdir;
 our $sysuidmax;
 our $sysgidmax;
+our $uidoffset;
+our $gidoffset;
 our $defaultdomain;
 our $siteusersfilename;
 our $sitegroupsfilename;
