@@ -593,7 +593,7 @@ sub maint_getsiteusers
 
         $gecos = $uname unless $gecos;
         $shell = '/bin/true' if $disabled;
-	print "debug: $uname, disabled=$disabled, shell=$shell\n";
+	#print "debug: $uname, disabled=$disabled, shell=$shell\n";
         $rhomedirserver .= $defaultdomain if
 		defined $rhomedirserver && length($rhomedirserver) &&
                 $rhomedirserver !~ m/\./ && $defaultdomain =~ /\./;
