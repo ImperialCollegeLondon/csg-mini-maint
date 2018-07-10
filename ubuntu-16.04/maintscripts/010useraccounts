@@ -164,7 +164,7 @@ sub dopasswd
         }
 
         $t = keys %$usersbyid;
-        maint_info( "Got $t existing user accounts from current passwd file");
+        maint_info( "Got $t existing accounts from current passwd file");
 
 	unless( exists $sysusersbyid->{0} )
 	{
@@ -250,7 +250,7 @@ sub dogroup
         }
 
         $t = keys %$groupsbyid;
-        maint_info( "Got $t existing user groups from current group file" );
+        maint_info( "Got $t existing groups from current group file" );
 
 	unless( exists $sysgroupsbyid->{0} )
 	{
@@ -293,13 +293,14 @@ sub doamdhomes
 
 sub doautofshomes
 {
-    maint_info( "Doing /etc/auto.homes");
+    maint_info( "Doing $autohomesfilename");
 
     my $contents = maint_composeautofs($siteusersbyid);
 
-    my ($fd, $fh) = maint_safeopen('/etc/auto.homes');
-    maint_fatalerror( 'Cannot safe_open /etc/auto.homes') unless defined $fd;
+    my ($fd, $fh) = maint_safeopen($autohomesfilename);
+    maint_fatalerror( "Cannot safe_open $autohomesfilename")
+    	unless defined $fd;
     print $fd $contents;
     maint_safeclose($fh);
-    maint_info( "Updated /etc/auto.homes");
+    maint_info( "Updated $autohomesfilename");
 }
