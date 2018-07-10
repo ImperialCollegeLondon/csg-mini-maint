@@ -383,7 +383,7 @@ sub maint_composeautofs
         my $name  = $ur->{name};
         my $rserv = $ur->{'homedirremoteserver'};
         my $rpath = $ur->{'homedirremotepath'};
-        unless( defined $name && defined $rserv && defined $rpath )
+        unless( $name && $rserv && $rpath )
         {
             maint_debug( "Ignoring user $name, no central home dir" );
             next;
