@@ -204,6 +204,8 @@ sub _init_config ()
 		$maxsuppgroups = maint_getconfig( "users:maxgroups" ) // 16;
 		$sysuidmax = maint_getconfig( "users:sysuidmax" ) // 99;
 		$sysgidmax = maint_getconfig( "users:sysgidmax" ) // 99;
+		$uidoffset = maint_getconfig( "users:uidoffset" ) // 0;
+		$gidoffset = maint_getconfig( "users:gidoffset" ) // 0;
 	        $requiredrootusersfilename =
 		    maint_getconfig( "users:requiredrootusers" ) //
 		    "required-root-users.txt";
