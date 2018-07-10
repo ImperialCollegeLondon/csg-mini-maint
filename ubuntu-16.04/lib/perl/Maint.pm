@@ -114,7 +114,7 @@ sub readhash ($)
 	{
 		chomp;
 		s/^\s+//; s/\s+$//;
-		next if /^#/;
+		next if /^#/ || /^$/;
 		my( $k, $v ) = split( /\s+/, $_, 2 );
 		$hash{$k} = $v;
 	}
