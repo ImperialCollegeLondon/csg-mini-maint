@@ -651,8 +651,9 @@ sub maint_getsitegroups
 		"(not $sitegroupsfilename)" );
     }
 
-    open( my $infh, '<', $sitegroupsfilename ) ||
-	maint_fatalerror( "Can't read site groups file $sitegroupsfilename" );
+    my $conffile = "$configdir/$sitegroupsfilename";
+    open( my $infh, '<', $conffile ) ||
+	maint_fatalerror( "Can't read site groups file $conffile" );
     my @sitegroups;
     while( <$infh> )
     {
