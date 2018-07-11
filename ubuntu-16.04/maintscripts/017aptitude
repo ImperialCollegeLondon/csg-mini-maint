@@ -214,8 +214,7 @@ my @removepackages = grep { /\_$/ } @packages;
 
 if( @removepackages )
 {
-	maint_info( "Hostpp says: remove @removepackages" );
-
+	maint_debug( "Hostpp: want to remove @removepackages" );
 	@packages = grep { ! /\_$/ } @packages;
 	# unwanted packages trump wanted packages; remove unwanted from @p
 	my %removehash = map{ $_=>1 } @removepackages;
