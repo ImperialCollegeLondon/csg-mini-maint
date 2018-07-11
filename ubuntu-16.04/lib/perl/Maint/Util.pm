@@ -112,7 +112,7 @@ sub _run_lookup ($$)
 
     return () unless $run_raw;
 
-    my @run = split( /\s+/, $run_raw );
+    my @run = split( /\s*,\s*/, $run_raw );
     return @run;
 }
 
