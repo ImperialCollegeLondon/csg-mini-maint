@@ -85,7 +85,7 @@ The options which it recognises are:
         --[no]machineread  - Makes logs machine readable
     	--trace=none|caller|stack - sets trace mode
 	--mode=boot|install|manual|cron - Set the `time' for the script (defaults to manual)
-        --hostname         - Run this script as if on host hostname
+        --hostname=H       - Run this script as if on host H
 	--list             - Display all scriptnames
 
 =cut
@@ -191,10 +191,13 @@ sub maint_pushargs ()
 
 =head1 AUTHORS
 
-Duncan White E<lt>dcw@doc.ic.ac.ukE<gt>, 
-Matt Johnosn E<lt>mwj@doc.ic.ac.ukE<gt>, 
-Adam Langley E<lt>agl@imperialviolet.orgE<gt>, 
-Tim Southerwood E<lt>ts@dionic.netE<gt>
+Duncan White  E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara  E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson  E<lt>mwj@doc.ic.ac.ukE<gt>,
+Don Riden     E<lt>driden@doc.ic.ac.ukE<gt>,
+David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
+Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
+Tim Southerwood, E<lt>ts@dionic.netE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
@@ -202,4 +205,3 @@ Copyright 2003-2018 Department of Computing, Imperial College London
 
 =cut
 
-__END__
