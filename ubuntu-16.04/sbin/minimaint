@@ -419,6 +419,8 @@ if( maint_getattr( "list" ) == 1 )
 # Check if root.
 maint_fatalerror( "minimaint: need to run as root" ) if $> != 0;
 
+maint_usage() if $mode eq "manual" && @scripts == 0;
+
 # Ok, if no scripts, find all scripts that should
 # run in the given mode, accumulate in @scripts..
 
