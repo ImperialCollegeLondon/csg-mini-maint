@@ -26,14 +26,8 @@ or $ENV{MM_CONFIG_DIR} if it's set.
   --[no]logperline    - Display log message one per line (default no)
   --[no]colour        - Display log message with colour (default yes)
   --[no]machineread   - Makes logs machine readable
-  --mode=boot
-         cron-15
-         cron-30
-         cron-60
-	 cron-0300hrs
-	 cron-0400hrs
-         install
-         manual          - Set the run "mode"
+  --mode=install|boot|cron|manual
+  		      - Set the run "mode"
   --trace=none|caller|stack
                       - sets trace mode
 =cut
@@ -43,7 +37,7 @@ or $ENV{MM_CONFIG_DIR} if it's set.
 use strict;
 use warnings;
 use File::Basename;
-use File::Slurp;
+#use File::Slurp;
 use File::Path;
 use Cwd qw(getcwd abs_path);
 use Data::Dumper;
@@ -382,7 +376,6 @@ maint_setlogging();
 
 # process command line args
 my $mode = maint_getattr( "mode" );
-maint_usage() unless maint_getattr("list") || $mode || @ARGV;
 our @scripts = @ARGV;
 
 # Put back script args
@@ -396,6 +389,8 @@ my @scriptinfo = findscripts();
 # list mode: display the names of all maint scripts
 if( maint_getattr( "list" ) == 1 )
 {
+	maint_usage() if $mode || @scripts;
+
 	# Scan all scripts
 	foreach my $sc (@scriptinfo)
 	{
@@ -449,26 +444,30 @@ refreshconfigdir( $configdir );
 
 maint_clearlock();
 
-# Run desired scripts (if allowed)
-my %requestedscripts = map { $_ => 1 } @scripts;
-
 maint_debug( "Want to run scripts @scripts" );
 
-foreach my $sc (@scriptinfo)
+my %scriptsbybasename = map { $_->{base} => $_ } @scriptinfo;
+
+foreach my $base (@scripts)
 {
+	my $sc = $scriptsbybasename{$base};
+	unless( defined $sc )
+	{
+		maint_warning( "Ignoring non-existent script $base");
+		maint_lognewline();
+		next;
+	}
 	my $num = $sc->{num};
-	my $base = $sc->{base};
+	die "Weird, base $base, scriptsbybasename{$base}: ". Dumper $sc
+		unless $base eq $sc->{base};
 	my $scriptpath = $sc->{file};
 	my $scriptname = basename( $scriptpath );
 
 	maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
 	$scriptdirs{$num} = { path => $scriptpath, file => $scriptname, base => $base, run => 0 };
-	if( @scripts == 0 || exists $requestedscripts{$base} )
-	{
-		# We want to run this
-		$scriptdirs{$num}->{run} = 1;
-		delete $requestedscripts{$base};    # Got it
-	}
+
+	# We want to run this
+	$scriptdirs{$num}->{run} = 1;
 
 	# should we exclude any scripts due to runwhen/runon constraints?
 	unless( maint_runwhen($scriptname, $mode) )
@@ -485,11 +484,6 @@ foreach my $sc (@scriptinfo)
 		$scriptdirs{$num}->{run} = 0;
 	}
 }
-foreach my $t (sort keys %requestedscripts)
-{
-	maint_warning( "Ignoring non-existent script $t");
-	maint_lognewline();
-}
 
 # Run all requested on local machine
 # Note, numeric sorting, not string order
@@ -498,7 +492,7 @@ foreach my $t (sort keys %requestedscripts)
 my @runscripts = grep { $scriptdirs{$_}->{run} } @scripts;
 
 # Generate list of scripts that will be run and announce.
-my $lists = join(",", map { $scriptdirs{$_}->{base} } @runscripts );
+my $lists = join(" ", map { $scriptdirs{$_}->{base} } @runscripts );
 maint_debug( "About to run $lists");
 
 foreach my $k ( @runscripts )
