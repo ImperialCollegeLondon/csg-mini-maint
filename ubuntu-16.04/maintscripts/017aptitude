@@ -160,6 +160,7 @@ if( defined $skipmsg )
 {
 	maint_info( $skipmsg );
 	maint_exit();
+	exit(0);
 }
 
 # If we're in install-mode, and if /usr/local/lib/libeatmydata.so exists,

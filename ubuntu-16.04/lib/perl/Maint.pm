@@ -286,6 +286,7 @@ sub maint_exit
 	}
 	maint_closelog();    # Shut down logging with a nice exit message.
 	$correctly_exited = 1;
+	exit(0);
 }
 
 =head2 B<maint_setlogging(bool:silent, bool:debug)>
