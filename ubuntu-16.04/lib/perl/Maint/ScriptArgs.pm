@@ -53,14 +53,8 @@ Options to maint scripts:
     --[no]colour       - Display log message with colour (default yes)
     --[no]machineread  - Makes logs machine readable
     --list             - Display all scriptnames and exit
-    --mode=boot
-         cron-15
-         cron-30
-         cron-60
-	 cron-0300hrs
-	 cron-0400hrs
-         install
-         manual        - Set the run "mode"
+    --mode=install|boot|cron|manual
+    		       - Set the run "mode"
     --trace=none|caller|stack
                        - sets trace mode
 END
