@@ -174,7 +174,7 @@ if( $mode eq "install" && -e "/usr/local/lib/libeatmydata.so" )
 
 my @packages = maint_compose( "$configdir/$filename" );
 
-maint_info( "want following pkgs: " . join(", ", @packages) );
+#maint_info( "want following pkgs: " . join(" ", @packages) );
 
 $ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
 
