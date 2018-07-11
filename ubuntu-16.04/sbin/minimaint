@@ -381,19 +381,14 @@ maint_initarg();             # @ARGV contains remaining args only
 maint_setlogging();
 
 # process command line args
-maint_usage() unless maint_getattr("list") || @ARGV;
+my $mode = maint_getattr( "mode" );
+maint_usage() unless maint_getattr("list") || $mode || @ARGV;
 our @scripts = @ARGV;
 
 # Put back script args
 @ARGV = ();
 maint_pushargs();
 
-maint_debug( "scripts to run: ". join(' ',@scripts) ) if @scripts;
-
-# Check if root.
-maint_fatalerror( "minimaint: need to run as root" ) if $> != 0;
-
-my $mode = maint_getattr( "mode" );
 maint_initlog("maint system in $cachedir (production, mode $mode)");
 
 my @scriptinfo = findscripts();
@@ -406,17 +401,41 @@ if( maint_getattr( "list" ) == 1 )
 	{
 		my $num = $sc->{num};
 		my $base = $sc->{base};
-		print "maint script: $num $base\n";
+		maint_warning( "maint script: $num $base" );
+		maint_lognewline();
 	}
 
-	maint_closelog();
+	#maint_closelog();
+	maint_exit();
 	exit(0);
 }
 
-my $cd = maint_getconfigdir();
-my $chs = maint_getconfig( "hostclass:source" );
-my $chf = maint_getconfig( "hostclass:file" );
-maint_debug( "Configdir=$cd, hostclass:source=$chs, hostclass:file=$chf" );
+# Check if root.
+maint_fatalerror( "minimaint: need to run as root" ) if $> != 0;
+
+# should be EITHER --mode=X OR name 1 or more scripts on command line
+maint_usage() if $mode && @scripts;
+
+# Ok, if --mode=X and no scripts, find all scripts that should run in
+# that mode, accumulate in @scripts..
+
+if( $mode && @scripts == 0 )
+{
+	# Scan all scripts
+	foreach my $sc (@scriptinfo)
+	{
+		my $num = $sc->{num};
+		my $base = $sc->{base};
+		my $scriptpath = $sc->{file};
+		my $scriptname = basename( $scriptpath );
+
+		maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
+
+		push @scripts, $base if maint_runwhen($scriptname, $mode);
+	}
+}
+
+maint_info( "scripts to run: ". join(' ',@scripts) ) if @scripts;
 
 # Reload cached class data
 maint_lockname($scriptlock);
@@ -425,7 +444,7 @@ maint_fatalerror( 'Cannot get lock, aborting' ) unless maint_setlock();
 maint_reloadclasses(1);
 @classlist = maint_listclasses();
 
-# and config dir (if git controlled)
+# and refresh config dir (if git controlled)
 refreshconfigdir( $configdir );
 
 maint_clearlock();
@@ -444,7 +463,7 @@ foreach my $sc (@scriptinfo)
 
 	maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
 	$scriptdirs{$num} = { path => $scriptpath, file => $scriptname, base => $base, run => 0 };
-	if (@scripts == 0 || exists $requestedscripts{$base})
+	if( @scripts == 0 || exists $requestedscripts{$base} )
 	{
 		# We want to run this
 		$scriptdirs{$num}->{run} = 1;
@@ -452,12 +471,12 @@ foreach my $sc (@scriptinfo)
 	}
 
 	# should we exclude any scripts due to runwhen/runon constraints?
-	my $mode = maint_getattr('mode');
 	unless( maint_runwhen($scriptname, $mode) )
 	{
 		maint_warning( "Skipping $scriptname due to runwhen/ constraint");
 		maint_lognewline();
 		$scriptdirs{$num}->{run} = 0;
+
 	}
 	unless( maint_checkrunon($scriptname, \@classlist ))
 	{
