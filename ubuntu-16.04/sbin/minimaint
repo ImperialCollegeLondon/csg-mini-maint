@@ -357,14 +357,13 @@ sub findscripts()
 my $phase2filename = "$configdir/phase2";
 loadphase2config( $phase2filename );
 
-# Tell the maint scripts that we're about to invoke where their configdir is
+# Tell the maint scripts (that we're about to invoke) where their configdir is
 $ENV{MM_CONFIG_DIR} = $configdir;
 
 # copy $configdir and %config into maint's inner depths..
 maint_setconfig( $configdir, \%config );
 
 my %scriptdirs = ();         # Global for passing set of scripts around
-my @origargv  = @ARGV;
 my @classlist = ();
 
 # Process the generic options
@@ -373,7 +372,20 @@ maint_initarg();             # @ARGV contains remaining args only
 # Init logging
 maint_setlogging();
 
+# Reload cached class data
+maint_lockname($scriptlock);
+maint_fatalerror( 'Cannot get lock, aborting' ) unless maint_setlock();
+
+maint_reloadclasses(1);
+@classlist = maint_listclasses();
+
+# and refresh config dir (if git controlled)
+refreshconfigdir( $configdir );
+
+maint_clearlock();
+
 # process command line args
+
 my $mode = maint_getattr( "mode" );
 our @scripts = @ARGV;
 
@@ -388,7 +400,7 @@ my @scriptinfo = findscripts();
 # list mode: display the names of all maint scripts
 if( maint_getattr( "list" ) == 1 )
 {
-	maint_usage() if $mode || @scripts;
+	maint_usage() if @scripts;
 
 	# Scan all scripts
 	foreach my $sc (@scriptinfo)
@@ -399,23 +411,18 @@ if( maint_getattr( "list" ) == 1 )
 		maint_lognewline();
 	}
 
-	#maint_closelog();
-	maint_exit();
+	maint_closelog();
+	#maint_exit();
 	exit(0);
 }
 
 # Check if root.
 maint_fatalerror( "minimaint: need to run as root" ) if $> != 0;
 
-# should be EITHER --mode=X OR name 1 or more scripts on command line
-maint_usage() if $mode && @scripts;
+# Ok, if no scripts, find all scripts that should
+# run in the given mode, accumulate in @scripts..
 
-print "still standing after 'die if mode and scripts' test\n";
-
-# Ok, if --mode=X and no scripts, find all scripts that should run in
-# that mode, accumulate in @scripts..
-
-if( $mode )
+if( @scripts == 0 )
 {
 	# Scan all scripts
 	foreach my $sc (@scriptinfo)
@@ -436,18 +443,6 @@ if( $mode )
 print "debug: scripts to run: ". join(' ',@scripts). "\n";
 
 maint_info( "scripts to run: ". join(' ',@scripts) ) if @scripts;
-
-# Reload cached class data
-maint_lockname($scriptlock);
-maint_fatalerror( 'Cannot get lock, aborting' ) unless maint_setlock();
-
-maint_reloadclasses(1);
-@classlist = maint_listclasses();
-
-# and refresh config dir (if git controlled)
-refreshconfigdir( $configdir );
-
-maint_clearlock();
 
 maint_debug( "Want to run scripts @scripts" );
 
@@ -501,8 +496,8 @@ foreach my $k ( @runscripts )
 {
 	runmaintscript($scriptdirs{$k}->{path}, @ARGV);
 }
-#maint_closelog();
-maint_exit();
+maint_closelog();
+#maint_exit();
 exit;
 
 =head1 AUTHORS
