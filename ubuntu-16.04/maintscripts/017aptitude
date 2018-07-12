@@ -6,6 +6,7 @@ use strict;
 use warnings;
 
 use Data::Dumper;
+use File::Slurp;
 use Maint qw(:all);
 
 our $dpkg = "/usr/bin/dpkg";
@@ -116,44 +117,22 @@ sub display_nth
 }
 
 
-# move this to WHERE?   site/AptCheck.pm in the config dir?
-#
-# my $mesg = site_aptitude_check( $mode, %inclass );
-#	Perform site specific aptitude checks, given the $mode and
-#	%inclass (the set of which hostclasses this host is in).
-#	Returns a non-empty message if we should SKIP running maint aptitude
-#	(the message will be printed with maint_info());
-#	Returns undef if it's ok to carry on.
-#
-sub site_aptitude_check ($%)
-{
-	my( $mode, %inclass ) = @_;
-
-	# If we are both in class THEATRE and it's currently during standard
-	# hours, skip so that we don't disturb any teaching in progress.
-	my $hour = (localtime(time()))[2];
-	if( $inclass{THEATRE}
-	&&  $hour >= 9
-	&&  $hour <= 18
-	&& $mode ne "install")
-	{
-		return "Will not run maint aptitude on THEATRE machines ".
-			"during 09:00..18:59";
-	}
-	return undef;
-}
-
-
 maint_init();
 
 my $configdir = maint_getconfigdir();
-my $filename = maint_getconfig( "packagelists" );
+my $filename = maint_getconfig( "aptitude:packagelists" ) // "pkglists";
+my $sitecheck = maint_getconfig( "aptitude:sitecheck" );
+my $perlcode = read_file( "$configdir/$sitecheck" ) //
+	"sub site_aptitude_check { return undef; }";
 
 our $stderr;
 
 # Calculate the set of classes we're in.
 my %inclass = map { $_ => 1 } maint_listclasses();
 my $mode = maint_getattr("mode");
+
+# this should define the function site_aptitude_check..
+eval $perlcode;
 
 my $skipmsg = site_aptitude_check( $mode, %inclass );
 if( defined $skipmsg )
