@@ -1,0 +1,229 @@
+#!/usr/bin/perl
+
+=head1 NAME
+
+bootstrap
+
+=head1 SYNOPSIS
+
+bootstrap
+
+=head1 DESCRIPTION
+
+Sets things up for minimaint to run later, and then runs "minimaint hello".
+
+=cut
+
+# --- Compiler directives ---------------------------------------------------
+
+use strict;
+use warnings;
+#use File::Basename;
+use File::Path qw(mkpath rmtree);
+use Cwd;
+use Data::Dumper;
+
+# --- Global variables ------------------------------------------------------
+
+our $git = "/usr/bin/git";
+
+our %config;		# our configuration info
+
+# bits of the config, pulled out for convenience..
+our $gitrepo;		# URL of git repo containing the source
+our $lsbid;		# which distro (eg Ubuntu)
+our $lsbrelease;	# which release of Ubuntu (eg 16.04)
+our $cachedir;		# where to store local src eg /var/cache/minimaint
+our $distribution;	# lc(lsbid)+'-'+lsbrelease, eg ubuntu-16.04
+
+# Computed later
+our $configdir;
+
+# --- Subroutines -----------------------------------------------------------
+
+#
+# my %hash = readhash( $filename );
+#	read a file representing a hash (space separated key and value)
+#
+sub readhash ($)
+{
+	my( $filename ) = @_;
+	my %hash = ();
+	open( my $fh, '<', $filename ) || return %hash;
+	while( <$fh> )
+	{
+		chomp;
+		s/^\s+//; s/\s+$//;
+		next if /^#/;
+		my( $k, $v ) = split( /\s+/, $_, 2 );
+		$hash{$k} = $v;
+	}
+	return %hash;
+}
+
+
+#
+# loadphase1config();
+#	load the compulsory configuration file..
+#
+sub loadphase1config()
+{
+	$configdir = "/etc/minimaint";
+	my $file = "$configdir/phase1";	# phase 1 configuration
+	%config = readhash( $file );
+	die "minimaint: can't read phase 1 config file $file\n" unless
+		%config;
+
+	$gitrepo = $config{gitrepo} || die "minimaint: no config gitrepo\n";
+	$lsbid = $config{lsbid} || die "minimaint: no config lsbid\n";
+	$lsbrelease = $config{lsbrelease} ||
+		die "minimaint: no config lsbrelease\n";
+	$distribution = lc("$lsbid-$lsbrelease");
+	$cachedir = $config{cachedir} || die "minimaint: no config cachedir\n";
+
+	#print "debug phase1: configdir=$configdir, cachedir=$cachedir\n";
+}
+
+
+#
+# fullclone( $giturl, $repodest );
+#	blow the destination target dir away, fresh clone.
+#
+sub fullclone ($$)
+{
+	my( $giturl, $repodest ) = @_;
+
+	system("rm -rf $repodest");
+	mkpath([$repodest], 0, 0755);
+
+	system("$git clone --depth 1 --quiet $giturl $repodest") == 0 ||
+		die "Clone still failed, failed\n";
+}
+
+
+#
+# loadcache( $giturl, $repodest );
+#	Synchronize our local cache from upstream via git,
+#	given $giturl, the remote url to grab, and
+#	$repodest, the path to store our local cache,
+#	e.g. /var/cache/minimaint/.
+#
+sub loadcache ($$)
+{
+	my( $giturl, $repodest ) = @_;
+
+	chdir("/");
+	rmtree([$repodest]) if -d $repodest;
+	mkpath([$repodest], 0, 0755);
+
+	-d $repodest || die "Cannot create directory $repodest\n";
+	-w $repodest || die "directory $repodest not writable!\n";
+
+	#print "Cloning maint repository to $repodest...\n";
+	fullclone( $giturl, $repodest );
+}
+
+
+# Check that we're running the version of the operating system that we should
+# be -- otherwise, abort post-haste!
+
+sub check_os_version()
+{
+	my $actual_id = `/usr/bin/lsb_release -i -s`;
+	chomp $actual_id;
+
+	my $actual_release = `/usr/bin/lsb_release -r -s`;
+	chomp $actual_release;
+
+	unless( $actual_id eq $lsbid && $actual_release eq $lsbrelease )
+	{
+		die "Local operating system is '$actual_id $actual_release', ".
+		    "not '$lsbid $lsbrelease'; aborting now\n".
+		    "to avoid clobbering things I don't understand!\n";
+	}
+}
+
+# --------------- minimaint-bootstrap for Ubuntu -------------------
+
+
+print "\n1. Installing some prerequisite packages\n";
+system( "apt-get install autofs git aptitude libfile-slurp-perl libunix-syslog-perl libipc-run3-perl libjson-perl libfilesys-statvfs-perl perl-doc" );
+
+print "\n2. Reading site config repo URL from config.url\n";
+open( my $infh, '<', "config.url" ) || die "can't open config.url\n";
+my $confurl = <$infh>;
+chomp $confurl;
+close( $infh );
+
+print "  site config repo is: $confurl\n";
+
+print "\n3. Enter the hostname [or return to leave hostname as is]: ";
+
+my $hostname = <STDIN>;
+chomp $hostname;
+
+print "\n(You need to make sure this named host is configured in hostclasses\n";
+print "in $confurl for minimaint to work later)\n";
+
+if( $hostname )
+{
+	#print "Setting hostname to $hostname\n";
+	open( my $fh, '>', '/etc/hostname' ) ||
+		die "can't write /etc/hostname\n";
+	print $fh "$hostname\n";
+	close( $fh );
+
+	system( "hostname $hostname" );
+	print "Have set hostname to $hostname\n";
+}
+
+print "\n4. Cloning the site config git repo from $confurl into /etc:\n";
+
+my $conflinkdest = "/etc/minimaint";
+$confurl =~ m|/([^/]+)\.git$|;
+my $confdir = $1;
+
+chdir( "/etc" );
+fullclone( $confurl, $confdir );
+
+print "\n5. Symlinking $confdir to $conflinkdest\n";
+unlink( $conflinkdest );
+symlink( $confdir, $conflinkdest );
+
+print "\n6. Reading phase1 configuration information from /etc/minimaint\n";
+loadphase1config();
+
+print "\n7. Check that we're running on the correct OS!\n";
+check_os_version();
+
+print "\n8. Cloning minimaint from $gitrepo into $cachedir\n";
+
+loadcache( $gitrepo, $cachedir );
+
+print "\n9. Symlinking minimaint itself into /sbin/minimaint\n";
+my $minimaintpath = "$cachedir/$distribution/sbin/minimaint";
+my $dest          = "/sbin/minimaint";
+unlink( $dest );
+symlink( $minimaintpath, $dest );
+
+print "\n10. running 'minimaint hello' as a test:\n".
+unlink( "../bootstrap.tgz" );
+system( "minimaint hello" );
+
+exit 0;
+
+
+=head1 AUTHORS
+
+Duncan White E<lt>dcw@imperial.ac.ukE<gt>,
+Lloyd Kamara E<lt>ldk@imperial.ac.ukE<gt>,
+Matt Johnson E<lt>mwj@doc.ic.ac.ukE<gt>,
+David McBride E<lt>dwm@doc.ic.ac.ukE<gt>,
+Adam Langley, E<lt>agl@imperialviolet.orgE<gt>,
+Tim Southerwood, E<lt>ts@dionic.netE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright 2003-2018 Department of Computing, Imperial College London
+
+=cut
