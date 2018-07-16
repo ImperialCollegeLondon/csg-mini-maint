@@ -164,7 +164,7 @@ my @packages = maint_compose( "$configdir/$filename" );
 
 $ENV{'DEBIAN_FRONTEND'} = 'noninteractive';
 
-maint_info( "Forcing dpkg configuration actions");
+maint_info( "Force dpkg configure");
 maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef'], 0, LOG_WARNING);
 
 maint_info( "Updating package caches");
@@ -175,7 +175,7 @@ maint_runcmd( [ $aptget, '-y', 'update'], 0, LOG_WARNING);
 maint_info( "Forcing install");
 maint_runcmd( [ $aptitude, '-o', 'Dpkg::Options::=--force-confdef', '-v', '-y', '-f', 'install'], 0, LOG_WARNING);
 
-maint_info( "Forcing dpkg configuration actions (again, just in case..)");
+maint_info( "Forcing dpkg configure (again, just in case..)");
 maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef'], 0, LOG_WARNING);
 
 maint_info( "Dist-upgrading");
@@ -238,10 +238,10 @@ if( @packages )
 	open(OUT, ">/tmp/aptitude3.log");
 	print OUT $stderr;
 	close(OUT);
-}
 
-maint_info( "dpkg configuring, one more time..");
-maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef']);
+	maint_info( "dpkg configuring, one more time..");
+	maint_runcmd( [ $dpkg, '--configure', '-a', '--force-confdef']);
+}
 
 maint_info( "Running ldconfig");
 maint_runcmd( [ $ldconfig ]);
