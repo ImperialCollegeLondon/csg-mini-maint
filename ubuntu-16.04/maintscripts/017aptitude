@@ -133,18 +133,19 @@ my $mode = maint_getattr("mode");
 my $perlcode = read_file( "$configdir/$sitecheck" );
 if( defined $perlcode )
 {
-	if( eval $perlcode )
-	{
-	my $skipmsg = site_aptitude_check( $mode, %inclass );
-	if( defined $skipmsg )
-	{
-		maint_info( $skipmsg );
-		maint_exit();
-		exit(0);
-	}
-	} else
+	eval $perlcode;
+	if( $@ )
 	{
 		maint_warning( "Syntax error in $configdir/$sitecheck: $@" );
+	} else
+	{
+		my $skipmsg = site_aptitude_check( $mode, %inclass );
+		if( defined $skipmsg )
+		{
+			maint_info( $skipmsg );
+			maint_exit();
+			exit(0);
+		}
 	}
 }
 
