@@ -131,14 +131,20 @@ my $mode = maint_getattr("mode");
 
 # this should define the function site_aptitude_check..
 my $perlcode = read_file( "$configdir/$sitecheck" );
-if( defined $perlcode && eval $perlcode )
+if( defined $perlcode )
 {
+	if( eval $perlcode )
+	{
 	my $skipmsg = site_aptitude_check( $mode, %inclass );
 	if( defined $skipmsg )
 	{
 		maint_info( $skipmsg );
 		maint_exit();
 		exit(0);
+	}
+	} else
+	{
+		maint_warning( "Syntax error in $configdir/$sitecheck: $@" );
 	}
 }
 
