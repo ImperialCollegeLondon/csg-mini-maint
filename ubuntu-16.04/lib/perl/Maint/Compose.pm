@@ -18,6 +18,7 @@ our @EXPORT    = qw(
 our $VERSION = '0.01';
 
 use Cwd;
+use File::Slurp;
 use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
 
@@ -54,7 +55,6 @@ sub maint_compose ($)
 	my $basedir = shift;
 
 	my $cwd = getcwd();
-	print "compose: cwd=$cwd\n";
 
 	# Now we gather together all lines from files like:
 	# MOST_GENERAL_HOSTCLASS
@@ -71,17 +71,8 @@ sub maint_compose ($)
 		my $filename = "$basedir/$class";
 		next unless -f $filename;
 
-		if( open( my $infh, '<' . $filename ) )
-		{
-			#maint_debug( "maint_compose: $filename");
-			my @l = <$infh>;
-			close( $infh );
-			chomp @l;
-			push @lines, @l;
-		} else
-		{
-			maint_warning( "Can't read $filename");
-		}
+		my @l = read_file( $filename );
+		push @lines, @l;
 	}
 	return @lines;
 }
