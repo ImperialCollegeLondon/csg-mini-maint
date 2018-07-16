@@ -72,6 +72,7 @@ sub maint_compose ($)
 		next unless -f $filename;
 
 		my @l = read_file( $filename );
+		chomp @l;
 		push @lines, @l;
 	}
 	return @lines;
