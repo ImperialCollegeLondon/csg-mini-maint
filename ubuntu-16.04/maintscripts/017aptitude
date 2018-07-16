@@ -122,8 +122,6 @@ maint_init();
 my $configdir = maint_getconfigdir();
 my $filename = maint_getconfig( "aptitude:packagelists" ) // "pkglists";
 my $sitecheck = maint_getconfig( "aptitude:sitecheck" );
-my $perlcode = read_file( "$configdir/$sitecheck" ) //
-	"sub site_aptitude_check { return undef; }";
 
 our $stderr;
 
@@ -132,14 +130,16 @@ my %inclass = map { $_ => 1 } maint_listclasses();
 my $mode = maint_getattr("mode");
 
 # this should define the function site_aptitude_check..
-eval $perlcode;
-
-my $skipmsg = site_aptitude_check( $mode, %inclass );
-if( defined $skipmsg )
+my $perlcode = read_file( "$configdir/$sitecheck" );
+if( defined $perlcode && eval $perlcode )
 {
-	maint_info( $skipmsg );
-	maint_exit();
-	exit(0);
+	my $skipmsg = site_aptitude_check( $mode, %inclass );
+	if( defined $skipmsg )
+	{
+		maint_info( $skipmsg );
+		maint_exit();
+		exit(0);
+	}
 }
 
 # If we're in install-mode, and if /usr/local/lib/libeatmydata.so exists,
