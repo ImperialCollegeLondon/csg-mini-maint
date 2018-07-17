@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Maint qw(:all);
+
+maint_init();
+
+# Check to see if there's a pre-compiled tar-ball of locale data we should
+# install.
+
+my $configdir = maint_getconfigdir();
+my $archive   = "$configdir/locales/locale-archive.bz2";
+my $localearchive = "/usr/lib/locale/locale-archive";
+
+if( -e $archive )
+{
+   my $srcsize = (stat($archive))[7];
+   my $dstsize = -e $localearchive ? (stat($localearchive))[7] : 0;
+
+   # If $localearchive exists and is larger than
+   # $archive then no further action is required.
+   if( $dstsize < $srcsize )
+   {
+        maint_log(LOG_INFO, "Installing cache of pre-calculated locale data");
+        system("/usr/bin/pbzip2 -d -f -q -c $archive > $localearchive");
+   }
+}
+
+# Look up the list of installed locales.
+
+my %installed;
+open( my $lfh, '-|', "/usr/bin/locale");
+while( <$lfh> )
+{
+	chomp;
+	$installed{$_} = 1;
+}
+close($lfh);
+
+maint_info( "Generating locale data not already cached.." );
+
+open( my $cfh, '<', "/usr/share/i18n/SUPPORTED" );
+while( <$cfh> )
+{
+	next if /^#/;
+	if( /(\S+) (\S+)/ )
+	{
+		my ($name, $char) = ($1,$2);
+		my $locale = ( $name =~ /(.*)\./ ) ? $1 : $name;
+
+		next if defined $installed{$name};
+
+		# The locales are sometimes stored with slightly different
+		# names, with the character sets lower-cased and the hyphens
+		# removed. Therefore we need to compare the intended locale
+		# and the name of those installed carefully.
+		my $stored_locale;
+		my $stored_charset;
+		my $stored_suffix;
+		if( $name =~ /([^\.]+)(\.[^\.]+)?(\..*)?/ )
+		{
+			$stored_locale = $1;
+			$stored_charset = $2;
+			$stored_suffix = $3;
+			$stored_charset ||= "";
+			$stored_suffix ||= "";
+			$stored_charset =~ tr/-//;
+			$stored_charset = lc($stored_charset);
+		}
+	
+		my $altname = "$stored_locale$stored_charset$stored_suffix";
+		next if defined $installed{$altname};
+		maint_info( "$name" );
+		maint_runcmd(['/usr/sbin/locale-gen', $name], undef, 1);
+	}
+}
+close( $cfh );
+
+maint_exit();
