@@ -21,6 +21,7 @@ use Cwd;
 use File::Slurp;
 use Maint::Log qw(:all);
 use Maint::HostClass qw(:all);
+use Maint::Utils qw(:all);
 
 =head1 NAME
 
