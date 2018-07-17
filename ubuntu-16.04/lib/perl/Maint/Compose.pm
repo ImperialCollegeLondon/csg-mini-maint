@@ -46,7 +46,8 @@ None by default, :all will export the above.
 This will return an array of all lines of the composition of matching
 class files, most generic hostclass files first, most specific last.
 
-It returns undef on failure.
+NB: If the directory contains "$hostname.ONLY" then the contents of
+that file, alone, are read and returned.
 
 =cut
 
@@ -56,6 +57,15 @@ sub maint_compose ($)
 
 	my $cwd = getcwd();
 
+	my $h = maint_hostname();
+	my $only = "$basedir/$h.ONLY";
+	if( -f $only )
+	{
+		my @l = read_file( $only );
+		chomp @l;
+		return @l;
+	}
+
 	# Now we gather together all lines from files like:
 	# MOST_GENERAL_HOSTCLASS
 	#    LESS_GENERAL_HOSTCLASS
@@ -64,7 +74,6 @@ sub maint_compose ($)
 	#
 
 	my @classes = reverse maint_listclasses();
-
 	my @lines;
 	foreach my $class (@classes)
 	{

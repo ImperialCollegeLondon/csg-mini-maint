@@ -1,0 +1,58 @@
+#!/usr/bin/perl
+#
+# 050alternatives: uses update-alternatives to set up alternative-based systems.
+
+use strict;
+use warnings;
+use Maint qw(:all);
+
+maint_init();
+
+# In order to update alternatives forcefully, place an appropriate file in
+# dist/var/lib/dpkg/alternatives with the correct priorities.
+
+my $configdir         = maint_getconfigdir();
+my $alternativesdir   = "$configdir/alternatives";
+
+my @lines = maint_compose( $alternativesdir );
+
+my $updatealt = "/usr/bin/update-alternatives";
+
+foreach (@lines)
+{
+	chomp;
+	my( $alt, $path ) = split(/\s+/, $_);
+
+	# If specified path does not exist, can't make it an alternative.
+	next unless -e $path;
+
+	# If already set to preferred choice, do nothing
+	my $current = "";
+	maint_runcmd([ $updatealt, '--display', $alt],
+		undef, 1, undef, \$current, \*STDERR);
+	next if $current =~ /^  link currently points to $path$/m;
+
+	# Attempt to register the program-file if necessary.
+	my $knownalts = "";
+	maint_runcmd([ $updatealt, '--list', $alt],
+		undef, 1, undef, \$knownalts, \*STDERR);
+#	print "knowalts: $knownalts\npath: '$path'\n";
+	if( $knownalts !~ /^$path$/m )
+	{
+		print "Installing '$path' as an alternative for '$alt'\n";
+		# need to install the alternative.
+		# First get the sym-link to use for installation
+		my $link = "";
+		maint_runcmd([ $updatealt, '--query', $alt],
+			undef, 1, undef, \$link, \*STDERR);
+		# Need a line beginning 'Link: ' followed by link-name.
+		if( $link =~ /^Link: (.*)$/m )
+		{
+			maint_runcmd([ $updatealt, '--install', $1, $alt, $path, '100'],
+				undef, LOG_DEBUG);
+		}
+	}
+	maint_runcmd([ $updatealt, '--set', $alt, $path], undef, LOG_DEBUG);
+}
+
+maint_exit();
