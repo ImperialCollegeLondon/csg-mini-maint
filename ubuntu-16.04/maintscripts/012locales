@@ -46,11 +46,9 @@ open( my $cfh, '<', "/usr/share/i18n/SUPPORTED" );
 while( <$cfh> )
 {
 	next if /^#/;
-	if( /^(\S+) (\S+)/ )
+	if( /^(\S+)\s/ )
 	{
-		my( $name, $char ) = ($1,$2);
-		my $locale = ( $name =~ /(.*)\./ ) ? $1 : $name;
-
+		my $name = $1;
 		next if defined $installed{$name};
 
 		# The locales are sometimes stored with slightly different
@@ -67,7 +65,7 @@ while( <$cfh> )
 			$stored_suffix = $3;
 			$stored_charset ||= "";
 			$stored_suffix ||= "";
-			$stored_charset =~ tr/-//;
+			$stored_charset =~ tr/-//d;
 			$stored_charset = lc($stored_charset);
 		}
 	
