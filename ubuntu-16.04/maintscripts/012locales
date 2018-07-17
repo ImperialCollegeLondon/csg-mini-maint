@@ -31,7 +31,7 @@ if( -e $archive )
 # Look up the list of installed locales.
 
 my %installed;
-open( my $lfh, '-|', "/usr/bin/locale");
+open( my $lfh, '-|', "/usr/bin/locale -a");
 while( <$lfh> )
 {
 	chomp;
