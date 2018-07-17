@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Data::Dumper;
+#use Data::Dumper;
 use Maint qw(:all);
 
 maint_init();
@@ -38,7 +38,7 @@ while( <$lfh> )
 	$installed{$_} = 1;
 }
 close($lfh);
-print Dumper \%installed;
+#print Dumper \%installed;
 
 maint_info( "Generating locale data not already cached.." );
 
