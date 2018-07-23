@@ -1,0 +1,212 @@
+#!/usr/bin/perl
+
+# 013kerberos: Write .k5login files, fetch krby5.keytab via ktd.
+# Matt Johnson <mwj>, based on original code by Adam Langley <agl02>
+# NB: DCW: This minimaint version **excludes** the "install and start sshd"
+# install-time code, as a). I haven't got install time support in minimaint
+# yet, and b). surely that code should be a separate INSTALL SCRIPT!
+
+use strict;
+use warnings;
+use IO::Socket;
+use Data::Dumper;
+use Maint qw(:all);
+use Maint::UserAccounts qw(:all);
+use Maint::ReadCSV qw(:all);
+
+maint_init();
+
+my $confdir = maint_getconfigdir();
+my $source = maint_getconfig( "kerberos:users_root" ) // "users_root";
+$source =~ s/^file://;
+$source = "$confdir/$source";
+
+my $domain = maint_getconfig( "domain" );
+my $realm = maint_getconfig( "realm" ) // uc($domain);
+my $ktdserver = maint_getconfig( "ktd_server" );
+my $ktdport = maint_getconfig( "ktd_port" ) // 760;
+
+my $keytab = "/etc/krb5.keytab";
+
+
+# First, extract the sanity-check-required-root-users list.
+
+my @sanity_users = maint_getsanityusers(); 
+maint_fatalerror( "Cannot read sanity_users, bombing now")
+	if @sanity_users == 0;
+
+#
+# my @rootusers = work_out_rootusers();
+#	Work out who should be the root users on this machine,
+#	using the users_root and stopclasses information.
+#
+sub work_out_rootusers
+{
+	my $stopclasses = maint_getconfig( "kerberos:stopclasses" ) //
+		"stopclasses";
+	$stopclasses =~ s/^file://;
+	$stopclasses = "$confdir/$stopclasses";
+
+	my @stoplist;
+	@stoplist = maint_readcsv( $stopclasses ) if -f $stopclasses;
+	my %stopclasses = map {$_->[0] => 1} @stoplist;
+
+	foreach my $d (keys %stopclasses)
+	{
+	    maint_debug( "Found stopclass $d");
+	}
+
+	my @allusersroot = maint_readcsv( $source );
+	die Dumper( \@allusersroot );
+
+	# form a hostclass -> list of root users data structure
+	my %usersroot_lookup;
+	map {
+		my( $class, $username ) = ( $_->{class}, $_->{username} );
+		$usersroot_lookup{$class} //= [];
+		my $aref = $usersroot_lookup{$class};
+		push @$aref, $username;
+	} @allusersroot;
+	die Dumper( \%usersroot_lookup );
+
+	# Form a list of root users that apply to this host
+	# We take the set of root users for each matching class,
+	# and take the union of them (unless we hit a stopclass,
+	# in which case, guess what - we stop and deliver the root users
+	# we've found so far).
+	# We then check that all the sanity-check-required-root-users
+	# are present
+
+	my %rootusers;
+
+	foreach my $hostclass (maint_listclasses()) 
+	{
+	    maint_debug( "Processing hostclass $hostclass");
+	    
+	    my $aref = $usersroot_lookup{$hostclass};
+	    foreach my $username (@$aref)
+	    {
+		$rootusers{$username}++;
+	    }
+
+	    if( exists $stopclasses{$hostclass} )
+	    {
+		maint_info( "Hit stopclass $hostclass, not including any more users");
+		last;
+	    }
+	}
+
+	foreach my $u (@sanity_users) 
+	{
+	    maint_fatalerror( "Missing sanity root user: $u - have to die now" )
+		    unless $rootusers{$u};
+	}
+
+	return sort keys %rootusers;
+}
+
+
+#
+# write_k5login( @rootusers );
+#	Populate the .k5login file from the users_root and stopclasses
+#	information.
+#
+sub write_k5login
+{
+	my( @rootusers ) = @_;
+
+	my( $k5l, $k5l_fd ) = maint_safeopen("/root/.k5login", 0400, 0, 0);
+	maint_fatalerror( "Cannot safely open k5login") unless defined $k5l;
+
+	maint_debug( "Safely updating /root/.k5login");
+
+	foreach my $u (@rootusers)
+	{
+	    maint_info( "Adding root user $u");
+	    print $k5l "$u/root\@$realm\n";
+	}
+
+	if( !maint_safeclose($k5l_fd) )
+	{
+	    maint_fatalerror( "Cannot safely close k5login -- ".
+	    	"old data preserved");
+	}
+}
+
+
+#
+# get_keytab();
+#	Check for a keytab. If it's gone missing, request a new one
+#	via KTD magic.
+#
+sub get_keytab
+{
+	# SEP-2017 [ldk] Check the contents of $keytab if it exists
+	# for correspondence with current hostname.
+	my $hname = Maint::Util::maint_hostname_long();
+	my $klist_check = "";
+	if( -f $keytab && ! -z $keytab )
+	{
+	    my $klist_check = `/usr/bin/klist -k $keytab | /bin/grep -o -m 1 "host/$hname\@$realm"`;
+	    if( $klist_check !~ /host\/$hname\@$realm/ )
+	    {
+		maint_debug( "No matching entry in $keytab found for $hname");
+		maint_info( "Deleting old $keytab");
+		unlink( $keytab );
+	    }
+	}
+
+	if( -f $keytab && ! -z $keytab )
+	{
+	    maint_debug( "Keytab seems okay");
+	} elsif( maint_getattr('dryrun') )
+	{
+	    maint_info( "Not asking for keytab even though I need one -- dry run");
+	} else
+	{
+	    unless( -f $keytab )
+	    {
+		if( defined $ktdserver )
+		{
+		    maint_info( "Asking for a keytab");
+		    foreach (1..5)
+		    {
+		        IO::Socket::INET->new('PeerAddr' => $ktdserver,
+					      'PeerPort' => $ktdport,
+					      'Proto'    => 'tcp') ||
+			    maint_info( "Error in socket connection");
+		        foreach (1..30)
+		        {
+			    last if -f $keytab;
+			    sleep 2;
+		        }
+		        last if -f $keytab;
+		        maint_info( "Asking again");
+		    }
+		} else
+		{
+			maint_warning( "Need keytab, but ".
+				"kerberos:ktd_server not set in config" );
+		}
+	   }
+	   if( -f $keytab )
+	   {
+		maint_info( "Got the keytab" );
+	   } else {
+		maint_warning( "Failed to get a keytab" );
+	   }
+	}
+}
+
+
+# Second, read the kerberos root user information, and stop classes info
+my @rootusers = work_out_rootusers();
+
+# Third, write out the k5login file...
+write_k5login( @rootusers );
+
+# Fourth, get the kerberos keytab file (if we haven't already got it)
+get_keytab();
+
+# All done.
+maint_exit();

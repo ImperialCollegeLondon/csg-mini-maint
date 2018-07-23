@@ -10,11 +10,12 @@ maint_init();
 mkdir( "/vol" ) unless -e "/vol";
 mkdir( "/homes" ) unless -e "/homes";
 
-maint_info( "Processing auto.vol" );
+maint_info( "Producing auto.vol and amd.vol" );
 
 my $confdir = maint_getconfigdir();
 my $domain = maint_getconfig( "domain" );
 my $source = maint_getconfig( "autovol:source" ) // "auto.vol";
+$source =~ s/^file://;
 $source = "$confdir/$source";
 
 open( my $autofh, "<" . $source ) ||
