@@ -176,13 +176,9 @@ sub _class_getall ($)
 
     my $confdir = maint_getconfigdir();
     my $conffile = "$confdir/$source";
-    my $infh;
 
-    unless( open( $infh, '<', $conffile ) )
-    {
-        maint_fatalerror(
-		"Can't open hostclass source $conffile");
-    }
+    open( my $infh, '<', $conffile ) ||
+        maint_fatalerror( "Can't open hostclass source $conffile");
 
     my $dontcare = <$infh>;	# first line is titles..  assume order is
     				# always parent,child,priority
