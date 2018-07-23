@@ -94,14 +94,16 @@ sub work_out_rootusers
 	    }
 	}
 
+	my @usersroot = sort keys %rootusers;
+
 	# Now check that all the sanity-check-required-root-users are present?
 	foreach my $u (@sanity_users) 
 	{
-	    maint_fatalerror( "Missing sanity root user: $u - have to die now" )
+	    maint_fatalerror( "Missing sanity root user: $u in list @usersroot" )
 		    unless $rootusers{$u};
 	}
 
-	return sort keys %rootusers;
+	return @usersroot;
 }
 
 
