@@ -57,7 +57,7 @@ sub work_out_rootusers
 	}
 
 	my @allusersroot = maint_readcsv( $source );
-	die Dumper( \@allusersroot );
+	#die Dumper( \@allusersroot );
 
 	# form a hostclass -> list of root users data structure
 	my %usersroot_lookup;
