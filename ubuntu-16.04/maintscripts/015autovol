@@ -1,0 +1,105 @@
+#!/usr/bin/perl
+
+use strict;       
+use warnings;     
+use Maint qw(:all); 
+
+maint_init();      
+
+# Ensure /homes and /vol exist.
+mkdir( "/vol" ) unless -e "/vol";
+mkdir( "/homes" ) unless -e "/homes";
+
+maint_info( "Processing auto.vol" );
+
+my $confdir = maint_getconfigdir();
+my $domain = maint_getconfig( "domain" );
+my $source = maint_getconfig( "autovol:source" ) // "auto.vol";
+$source = "$confdir/$source";
+
+open( my $autofh, "<" . $source ) ||
+    maint_fatalerror( "Cannot open $source for reading");
+
+my @entries = ();
+
+while( <$autofh> )
+{
+    chomp;
+    
+    s/#.*$//;  # Eat comments
+    s/^\s+//;  # Eat leading spaces
+    s/\s+$//;  # Eat trailing spaces
+    s/\s+/ /g; # Eat excess spaces
+    if( /^\s*$/ )
+    {
+        maint_debug( "Ignoring comment or blank line");
+        next;
+    }
+    my @map = split( /\s+/ );
+    if( @map > 3 )
+    {
+        maint_warning( "Garbled line after processing: [$_] - ignoring");
+        next;
+    }
+    my $mapname = shift @map;
+    my $nfsopts = undef;
+    if( @map == 2 )
+    {
+        $nfsopts = shift @map;
+        unless( $nfsopts =~ /^-/ )
+        {
+            maint_warning( "Bad format in option on line: $_ - skipping");
+            next;
+        }
+        $nfsopts =~ s/^-//;
+    }
+    my @parts = split( /:/, $map[0] );
+    unless( @parts == 2 )
+    {
+        maint_warning( "Garbled line after processing: [$_] - ignoring");
+        next;
+    }
+
+    $parts[0] .= ".$domain" if $domain && $parts[0] !~ /\./;
+
+    push @entries, {
+    	name => $mapname,
+	remotehost => $parts[0],
+	remotemount => $parts[1],
+	nfsopts => $nfsopts
+    };
+    maint_debug( "Got map entry: $map[0] $parts[0] $parts[1]");
+}
+close $autofh;
+
+unless( @entries > 0 )
+{
+    maint_fatalerror( "No autofs vol entries - not writing file" );
+}
+
+my ($fd1, $fh1) = maint_safeopen('/etc/amd.vol');
+maint_fatalerror( "Cannot safe_open /etc/amd.vol") unless defined $fd1;
+
+my ($fd2, $fh2) = maint_safeopen('/etc/auto.vol');
+maint_fatalerror( "Cannot safe_open /etc/auto.vol") unless defined $fd2;
+    
+foreach my $m (sort { $a->{name} cmp $b->{name} } @entries)
+{
+    my $name    = $m->{name};
+    my $rhost   = $m->{remotehost};
+    my $rfs     = $m->{remotemount};
+    my $nfsopts = $m->{nfsopts};
+
+    print $fd1 "$name\t\trhost:=$rhost;rfs:=$rfs";
+    print $fd1 ";opts:=$nfsopts" if defined $nfsopts;
+    print $fd1 "\n";
+
+    print $fd2 "$name\t\t";
+    print $fd2 "-$nfsopts\t\t" if defined $nfsopts;
+    print $fd2 "$rhost:$rfs\n";
+}
+
+maint_safeclose($fh1);
+maint_safeclose($fh2);
+
+maint_exit();
