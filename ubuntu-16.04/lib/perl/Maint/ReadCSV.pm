@@ -78,11 +78,12 @@ sub maint_readcsv
     {
 	chomp;
 	next if /^#/;
-	my $row = $csv->parse( $_ );
+	$csv->parse( $_ );
+	my @row = $csv->fields();
 	my $hashref = {};
-	foreach my $pos (0..$#$row)
+	foreach my $pos (0..$#row)
 	{
-		$hashref->{ $titles->[$pos] } = $row->[$pos];
+		$hashref->{ $titles->[$pos] } = $row[$pos];
 	}
 	push @result, $hashref;
     }
