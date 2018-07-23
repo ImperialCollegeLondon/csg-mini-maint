@@ -23,8 +23,8 @@ $source = "$confdir/$source";
 
 my $domain = maint_getconfig( "domain" );
 my $realm = maint_getconfig( "realm" ) // uc($domain);
-my $ktdserver = maint_getconfig( "ktd_server" );
-my $ktdport = maint_getconfig( "ktd_port" ) // 760;
+my $ktdserver = maint_getconfig( "kerberos:ktd_server" );
+my $ktdport = maint_getconfig( "kerberos:ktd_port" ) // 760;
 
 my $keytab = "/etc/krb5.keytab";
 
