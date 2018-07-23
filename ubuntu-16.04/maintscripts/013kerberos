@@ -67,15 +67,13 @@ sub work_out_rootusers
 		my $aref = $usersroot_lookup{$class};
 		push @$aref, $username;
 	} @allusersroot;
-	die Dumper( \%usersroot_lookup );
+	#die Dumper( \%usersroot_lookup );
 
 	# Form a list of root users that apply to this host
 	# We take the set of root users for each matching class,
 	# and take the union of them (unless we hit a stopclass,
 	# in which case, guess what - we stop and deliver the root users
 	# we've found so far).
-	# We then check that all the sanity-check-required-root-users
-	# are present
 
 	my %rootusers;
 
@@ -96,6 +94,7 @@ sub work_out_rootusers
 	    }
 	}
 
+	# Now check that all the sanity-check-required-root-users are present?
 	foreach my $u (@sanity_users) 
 	{
 	    maint_fatalerror( "Missing sanity root user: $u - have to die now" )
