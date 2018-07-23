@@ -49,7 +49,7 @@ sub work_out_rootusers
 
 	my @stoplist;
 	@stoplist = maint_readcsv( $stopclasses ) if -f $stopclasses;
-	my %stopclasses = map {$_->[0] => 1} @stoplist;
+	my %stopclasses = map {$_->{stopclass} => 1} @stoplist;
 
 	foreach my $d (keys %stopclasses)
 	{
