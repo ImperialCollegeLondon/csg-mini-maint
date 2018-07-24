@@ -32,7 +32,7 @@ if( $? )
 
 # TODO: check error conditions of commands, support exemption list
 
-maint_info( "Invoking 'ubuntu-drivers autoinstall' to install drivers'");
+maint_info( "Invoking 'ubuntu-drivers autoinstall' to install drivers");
 maint_runcmd([qw(/usr/bin/ubuntu-drivers autoinstall)], undef, 1);
 
 # All done.
