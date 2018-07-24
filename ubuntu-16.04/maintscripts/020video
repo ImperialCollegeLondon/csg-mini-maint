@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+
+# 020video: Detect the video card and install support packages
+# Completely gutted for Ubuntu Linux 16.04 (Xenial Xerus)
+# Let the 'ubuntu-drivers' command from the 'ubuntu-drivers-common'
+# package do all the work.  It will install more than just graphics
+# drivers but that is acceptable.
+# https://launchpad.net/ubuntu/+source/ubuntu-drivers-common
+ 
+use strict;
+use warnings;
+use Maint qw(:all);
+use Maint::Util qw(:all);
+use Data::Dumper;
+
+maint_init();
+
+# We need to:
+# - ensure that the 'ubuntu-drivers-common' package is installed.
+# - if there is no override configuration file for the current host, then
+#   invoke 'ubuntu-drivers autoinstall' 
+
+$ENV{DEBIAN_FRONTEND}="noninteractive";
+
+system( "/usr/bin/dpkg -l | grep ubuntu-drivers-common >/dev/null" );
+
+if( $? )
+{ 
+      maint_info( "Installing ubuntu-drivers-common for 'ubuntu-drivers' command.'");
+      maint_runcmd([qw(/usr/bin/aptitude -y install ubuntu-drivers-common -o Dpkg::Options::=--force-confdef)], undef, 1);
+}
+
+# TODO: check error conditions of commands, support exemption list
+
+maint_info( "Invoking 'ubuntu-drivers autoinstall' to install drivers'");
+maint_runcmd([qw(/usr/bin/ubuntu-drivers autoinstall)], undef, 1);
+
+# All done.
+maint_exit();
