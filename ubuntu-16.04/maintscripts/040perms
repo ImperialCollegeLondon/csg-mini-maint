@@ -268,7 +268,7 @@ my %isloop = (
 sub sm_error ($)
 {
 	my( $msg ) = @_;
-	my $line = $line[$currpos];
+	my $line = $line[$currpos] // "";
 	$currpos++;
 	maint_fatalerror( "$msg, line $currpos: $line" );
 }
