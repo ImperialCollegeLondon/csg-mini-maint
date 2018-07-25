@@ -140,8 +140,7 @@ while( my $psline = <$psfh> )
 	if( $process_type ne "None" )
 	{
 		my $firstname = $u2fn{$bits[0]};
-		#print "killing $bits[1], user $bits[0], firstname $firstname\n";
-		maint_debug( "killing process $bits[1], user $bits[0], firstname $firstname" );
+		maint_info( "killing process $bits[1], user $bits[0]" );
 		kill( 'TERM', $bits[1] );
 		send_mail( $bits[0], $firstname, $process_type,
 			  $hostname, "$title\n$psline" );
