@@ -210,7 +210,7 @@ sub group ($)
 sub facl ($)
 {
 	my( $facl ) = @_;
-	maint_info( "Setting facl of $currfile to $facl" );
+	#maint_info( "Setting facl of $currfile to $facl" );
 	system( "/usr/bin/setfacl -R -m '$facl' $currfile" )
 }
 
