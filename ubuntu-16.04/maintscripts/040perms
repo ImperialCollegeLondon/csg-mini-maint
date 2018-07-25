@@ -270,7 +270,10 @@ sub sm_error ($)
 	my( $msg ) = @_;
 	my $line = $line[$currpos] // "";
 	$currpos++;
-	maint_fatalerror( "$msg, line $currpos of $datafile: $line" );
+	maint_warning( "$msg, line $currpos of $datafile: $line" );
+	maint_warning( "Abandoning perms" );
+	maint_exit();
+	exit(0);
 }
 
 for( $currpos=0; $currpos < @line; $currpos++ )
