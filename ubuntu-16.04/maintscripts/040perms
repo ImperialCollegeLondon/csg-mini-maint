@@ -270,7 +270,7 @@ sub sm_error ($)
 	my( $msg ) = @_;
 	my $line = $line[$currpos] // "";
 	$currpos++;
-	maint_fatalerror( "$msg, line $currpos: $line" );
+	maint_fatalerror( "$msg, line $currpos of $datafile: $line" );
 }
 
 for( $currpos=0; $currpos < @line; $currpos++ )
