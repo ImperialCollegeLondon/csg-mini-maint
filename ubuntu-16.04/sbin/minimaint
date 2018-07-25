@@ -232,7 +232,7 @@ BEGIN {
 sub loadphase2config ($)
 {
 	my( $phase2filename ) = @_;
-	print "debug phase2: phase2filename=$phase2filename\n";
+	#print "debug phase2: phase2filename=$phase2filename\n";
 	my %newconfig = readhash( $phase2filename );
 	die "minimaint: can't slurp phase 2 config file $phase2filename\n"
 		unless %newconfig;
@@ -437,12 +437,9 @@ if( @scripts == 0 )
 		maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
 
 		next unless maint_runwhen($scriptname, $mode);
-		#print "debug: adding base $base to scripts list\n";
 		push @scripts, $base;
 	}
 }
-
-print "debug: scripts to run: ". join(' ',@scripts). "\n";
 
 maint_info( "scripts to run: ". join(' ',@scripts) ) if @scripts;
 
