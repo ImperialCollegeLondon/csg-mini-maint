@@ -35,7 +35,7 @@ foreach my $h (@hosts)
 	if( defined $ip )
 	{
 		$ip{$h} = $ip;
-		maint_info( "hosts: ip($h)==$ip" );
+		maint_info( "hostname $h, ip address $ip" );
 	} else
 	{
 		maint_fatalerror( "Can't hostlookup $h" );
