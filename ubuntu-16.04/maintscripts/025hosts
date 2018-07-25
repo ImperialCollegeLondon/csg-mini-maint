@@ -1,0 +1,78 @@
+#!/usr/bin/perl
+
+# 025hosts: Write /etc/hosts files.
+# Duncan White <dcw> & Matt Johnson <mwj>
+
+use strict;
+use warnings;
+#use IO::Socket;
+use Maint qw(:all);
+use Sys::Hostname;
+use Net::DNS;
+
+maint_init();
+
+my $hostname = maint_hostname();
+my $myip = maint_hostlookup( $hostname ) // `hostname -i`;
+maint_fatalerror( "Can't determine my IP address" ) unless defined $myip;
+
+chomp $myip;
+my %ip;
+$ip{$hostname} = $myip;
+
+maint_log(LOG_INFO, "hostname $hostname, ip address $myip");
+
+my $domain = maint_getconfig( "domain" ) // 'fluffybunny.org';
+
+my $vital = maint_getconfig( "hosts:vitalhosts" ) // '';
+my @hosts = split( /\s*,\s*/, $vital );
+
+# let's lookup some vital hosts
+
+foreach my $h (@hosts)
+{
+	my $ip = maint_hostlookup( $h );
+	if( defined $ip )
+	{
+		$ip{$h} = $ip;
+		maint_info( "hosts: ip($h)==$ip" );
+	} else
+	{
+		maint_fatalerror( "Can't hostlookup $h" );
+	}
+}
+push @hosts, $hostname;
+
+# Let's create the /etc/hosts file.
+
+my( $hosts, $hosts_fd ) = maint_safeopen("/etc/hosts", 0644, 0, 0);
+
+maint_fatalerror( "Cannot safely open /etc/hosts") unless defined($hosts);
+
+maint_debug( "Safely updating /etc/hosts" );
+
+my @pairs = (
+   "127.0.0.1", "localhost",
+   "::1", "ip6-localhost ip6-loopback",
+   "fe00::0", "ip6-localnet",
+   "ff00::0", "ip6-mcastprefix",
+   "ff02::1", "ip6-allnodes",
+   "ff02::2", "ip6-allrouters",
+   "ff02::3", "ip6-allhosts",
+);
+
+foreach my $h (@hosts)
+{
+	push @pairs, $ip{$h}, "$h.$domain $h";
+}
+
+# foreach pair (ip,name) in @pairs
+while( (my $ip, my $name, @pairs) = @pairs )
+{
+	printf $hosts "%-25s%s\n", $ip, $name;
+}
+
+maint_fatalerror( "Cannot safely close /etc/hosts -- old data preserved")
+	unless maint_safeclose($hosts_fd);
+
+maint_exit();
