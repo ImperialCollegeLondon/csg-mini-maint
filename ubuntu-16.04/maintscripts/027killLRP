@@ -35,7 +35,7 @@ my $sender = maint_getconfig( "killLRP:sender" ) //
 my $name_of_sender = maint_getconfig( "killLRP:sendername" ) //
 	"Dunc the Hunk";
 
-my $prohibited = main_getconfig( "killLRP:prohibited" ) // "java,ruby";
+my $prohibited = maint_getconfig( "killLRP:prohibited" ) // "java,ruby";
 my @prohibited = split( /\s*,\s*/, $prohibited );
 
 my $duration = maint_getconfig( "killLRP:duration" ) // 120;
