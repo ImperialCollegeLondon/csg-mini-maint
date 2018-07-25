@@ -127,8 +127,8 @@ sub ifdir
 	unless( defined $if_start )
 	{
 		$if_start = $currpos;
-		$if = "ifdir";
-		$skip = 0;
+		$if       = "ifdir";
+		$skip     = 0;
 	}
 	$skip = 1 unless -d $currfile;
 }
@@ -138,8 +138,8 @@ sub iffile
 	unless( defined $if_start )
 	{
 		$if_start = $currpos;
-		$if = "iffile";
-		$skip = 0;
+		$if       = "iffile";
+		$skip     = 0;
 	}
 	$skip = 1 unless -f $currfile;
 }
@@ -149,8 +149,8 @@ sub ifinclass
 	unless( defined $if_start )
 	{
 		$if_start = $currpos;
-		$if = "ifinclass";
-		$skip = 0;
+		$if       = "ifinclass";
+		$skip     = 0;
 	}
 	$skip = 1 unless maint_isinclass( $currfile );
 }
@@ -211,7 +211,7 @@ sub facl ($)
 {
 	my( $facl ) = @_;
 	maint_info( "Setting facl of $currfile to $facl" );
-	#system( "/usr/bin/setfacl -R -m \"$facl\" $currfile" )
+	system( "/usr/bin/setfacl -R -m '$facl' $currfile" )
 }
 
 my %isaction = (
@@ -222,9 +222,48 @@ my %isaction = (
 );
 
 
-# The State Machine itself..
+sub foreach ($)
+{
+	my( $arg ) = @_;
 
-my %isloop = map { $_ => 1 } qw(foreach end);
+	sm_error( "Nested foreach" ) if defined $foreach_start;
+	$foreach_start = $currpos;
+	@glob = glob( $arg );
+	$skip = @glob ? 0 : 1;
+	$currfile = @glob ? shift @glob : "<EMPTY GLOB>";
+}
+
+
+sub end_if_foreach ()
+{
+	if( defined $foreach_start )	# end of the current foreach
+	{
+		if( @glob )
+		{
+			$currfile = shift @glob;
+			$currpos = $foreach_start;
+			$skip = 0;
+		} else
+		{
+			undef $foreach_start; # fall through
+		}
+	} elsif( defined $if_start )	# end of the current if
+	{
+		undef $if_start;	# fall through
+		$skip = 0;
+	} else
+	{
+		sm_error( "'end' not in foreach or if*" );
+	}
+}
+
+my %isloop = (
+	foreach => \&foreach,
+	end     => \&end_if_foreach
+);
+
+
+# The State Machine itself..
 
 sub sm_error ($)
 {
@@ -262,40 +301,7 @@ for( $currpos=0; $currpos < @line; $currpos++ )
 	}
 	elsif( $isloop{$cmd} )
 	{
-		if( $cmd eq "foreach" )
-		{
-			sm_error( "Nested foreach" ) if defined $foreach_start;
-			$foreach_start = $currpos;
-			@glob = glob( $arg );
-			$skip = @glob ? 0 : 1;
-			$currfile = @glob ? shift @glob : "<EMPTY GLOB>";
-		} elsif( $cmd eq "end" )
-		{
-			if( defined $foreach_start )
-			{
-				if( @glob )
-				{
-					$currfile = shift @glob;
-					$currpos = $foreach_start;
-					$skip = 0;
-				} else
-				{
-					# exit foreach loop
-					undef $foreach_start;
-				}
-			} elsif( defined $if_start )
-			{
-				# end of if
-				undef $if_start;
-				$skip = 0;
-			} else
-			{
-				sm_error( "'end' not in foreach or if*" );
-			}
-		} else
-		{
-			sm_error( "Unknown loop cmd" );
-		}
+		$isloop{$cmd}->( $arg );
 	} else
 	{
 		sm_error( "Unknown line" );
