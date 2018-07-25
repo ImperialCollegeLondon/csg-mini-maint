@@ -32,8 +32,8 @@ my $text = read_file( $msgtextfile );
 my $sender = maint_getconfig( "killLRP:sender" ) //
 	'dcw@imperial.ac.uk';
 
-my $name_of_sender = maint_getconfig( "killLRP:sendername" ) //
-	"Dunc the Hunk";
+my $maildomain = maint_getconfig( "killLRP:domain" ) //
+	'imperial.ac.uk';
 
 my $prohibited = maint_getconfig( "killLRP:prohibited" ) // "java,ruby";
 my @prohibited = split( /\s*,\s*/, $prohibited );
@@ -50,7 +50,7 @@ sub send_mail ($$$$$)
 {
 	my( $user, $firstname, $processtype, $hostname, $psline ) = @_;
 
-	my $addr = $user . '@imperial.ac.uk';
+	my $addr = "$user\@$maildomain";
 	#$addr = 'mjb04@doc.ic.ac.uk';	# for testing
 
 	my $letter = $text;
