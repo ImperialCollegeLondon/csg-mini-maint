@@ -1,0 +1,151 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use Maint qw(:all);
+use Email::Simple;
+use File::Slurp;
+use Sys::Hostname;
+use Email::Sender::Simple qw(sendmail);
+
+maint_init();
+
+# DCW, will this fix the unpleasant double spacing in msg body?
+#      yes it does:-)
+{
+	no warnings 'redefine';
+	*Email::Simple::Creator::_crlf = sub { "\x0a" };
+}
+
+my $hostname = hostname;
+$hostname =~ s/\..*$//;		# remove domain
+
+my $confdir = maint_getconfigdir();
+my $msgtextfile = maint_getconfig( "killlongrunning:msg" ) //
+	'killlongrunning/msg';
+
+$msgtextfile = "$confdir/$msgtextfile";
+maint_fatalerror( "No msg text $msgtextfile!" ) unless -f $msgtextfile;
+my $text = read_file( $msgtextfile );
+
+my $sender = maint_getconfig( "killlongrunning:sender" ) //
+	'dcw@imperial.ac.uk';
+
+my $name_of_sender = maint_getconfig( "killlongrunning:sendername" ) //
+	"Dunc the Hunk";
+
+my $prohibited = main_getconfig( "killlongrunning:prohibited" ) // "java,ruby";
+my @prohibited = split( /\s*,\s*/, $prohibited );
+
+my $duration = maint_getconfig( "killlongrunning:duration" ) // 120;
+
+
+#
+# send_mail( $user, $firstname, $processtype, $hostname, $psline );
+#	Send a standard process killed email to $user, whose first name
+#	is $firstname, whose $processtype process we killed.
+#
+sub send_mail ($$$$$)
+{
+	my( $user, $firstname, $processtype, $hostname, $psline ) = @_;
+
+	my $addr = $user . '@imperial.ac.uk';
+	#$addr = 'mjb04@doc.ic.ac.uk';	# for testing
+
+	my $letter = $text;
+	$letter =~ s/FIRSTNAME/$firstname/g;
+	$letter =~ s/NASTYPROCESS/$processtype/g;
+	$letter =~ s/PSLINE/$psline/g;
+	$letter =~ s/HOSTNAME/$hostname/g;
+
+	my $message = Email::Simple->create(
+	    header => [
+	        From    => $sender,
+	        To      => $addr,
+	        Subject => "Shell Server $hostname : $processtype Job Termination",
+	    ],
+	    body => $letter,
+	);
+
+	# send the message
+	sendmail($message);
+	#print $letter . "\n"
+}
+
+
+#
+# my %u2fn = find_user_2_firstname();
+#	Read /etc/passwd, extract (username, firstname) pairs,
+#	then build and return the hash %u2fn mapping each such
+#	username to the corresponding firstname.
+#
+sub makeuser2firstname
+{
+	my %result = ();
+
+        setpwent();
+        while( my @entry = getpwent() )
+        {
+		my($username,$passwd,$uid,$gid,
+                      $quota,$comment,$gcos,$dir,$shell,$expire) = @entry;
+		$gcos =~ /^(\w+)/;
+		my $firstname = $1;
+		#print "username $username, firstname: $firstname\n";
+		$result{$username} = $firstname;
+        }
+        endpwent();
+	return %result;
+}
+
+
+
+#
+# my $type = check_process( $line, @banned_procs );
+#	Given a line $line of 'ps aux' format, and an array
+#	of banned process names @banned_procs, return the
+#	banned process name if $line is a banned process, or
+#	undef if not.
+#
+sub check_process ($@)
+{
+	my( $line, @banned_procs ) = @_;
+	foreach (@banned_procs)
+	{
+		return $_ if index($line, $_) != -1;
+	}
+	return "None";
+}
+
+##### main()
+
+my %u2fn = makeuser2firstname();
+unless( %u2fn )
+{
+    maint_fatalerror( "No usernames obtained from system." );
+}
+
+open( my $psfh, '-|', "ps aux" ) || maint_fatalerror( "can't run ps aux" );
+my $title = <$psfh>;
+
+while( my $psline = <$psfh> )
+{
+	chomp $psline;
+	my @bits = split(/\s+/, $psline);
+
+	my @time_val = split(/:/, $bits[9]);
+	next if $bits[0] eq "root" or $time_val[0] < $duration;
+
+	my $process_type = check_process( $bits[10], @prohibited );
+	if( $process_type ne "None" )
+	{
+		my $firstname = $u2fn{$bits[0]};
+		#print "killing $bits[1], user $bits[0], firstname $firstname\n";
+		maint_debug( "killing process $bits[1], user $bits[0], firstname $firstname" );
+		kill( 'TERM', $bits[1] );
+		send_mail( $bits[0], $firstname, $process_type,
+			  $hostname, "$title\n$psline" );
+	}
+}
+
+maint_exit();
