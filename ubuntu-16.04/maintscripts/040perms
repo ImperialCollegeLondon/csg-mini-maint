@@ -188,7 +188,7 @@ sub owner ($)
 	my @s = stat($currfile);
 	return if $s[4] == $o;
 	maint_info( "Setting owner of $currfile to $owner" );
-	#chown( $o, -1, $currfile );
+	chown( $o, -1, $currfile );
 }
 
 sub group ($)
@@ -203,7 +203,7 @@ sub group ($)
 	my @s = stat($currfile);
 	return if $s[5] == $g;
 	maint_info( "Setting group of $currfile to $group" );
-	#chown( -1, $g, $currfile );
+	chown( -1, $g, $currfile );
 }
 
 # should test whether the facl is already set..
