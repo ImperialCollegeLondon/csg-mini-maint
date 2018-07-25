@@ -173,7 +173,7 @@ sub perms ($)
 	my @s = stat($currfile);
 	return if $s[2] == $p;
 	maint_info( "Setting permissions of $currfile to $perms" );
-	#chmod( $p, $currfile );
+	chmod( $p, $currfile );
 }
 
 sub owner ($)
