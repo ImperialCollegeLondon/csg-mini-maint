@@ -22,23 +22,23 @@ my $hostname = hostname;
 $hostname =~ s/\..*$//;		# remove domain
 
 my $confdir = maint_getconfigdir();
-my $msgtextfile = maint_getconfig( "killlongrunning:msg" ) //
-	'killlongrunning/msg';
+my $msgtextfile = maint_getconfig( "killLRP:msg" ) //
+	'killLRP/msg';
 
 $msgtextfile = "$confdir/$msgtextfile";
 maint_fatalerror( "No msg text $msgtextfile!" ) unless -f $msgtextfile;
 my $text = read_file( $msgtextfile );
 
-my $sender = maint_getconfig( "killlongrunning:sender" ) //
+my $sender = maint_getconfig( "killLRP:sender" ) //
 	'dcw@imperial.ac.uk';
 
-my $name_of_sender = maint_getconfig( "killlongrunning:sendername" ) //
+my $name_of_sender = maint_getconfig( "killLRP:sendername" ) //
 	"Dunc the Hunk";
 
-my $prohibited = main_getconfig( "killlongrunning:prohibited" ) // "java,ruby";
+my $prohibited = main_getconfig( "killLRP:prohibited" ) // "java,ruby";
 my @prohibited = split( /\s*,\s*/, $prohibited );
 
-my $duration = maint_getconfig( "killlongrunning:duration" ) // 120;
+my $duration = maint_getconfig( "killLRP:duration" ) // 120;
 
 
 #
