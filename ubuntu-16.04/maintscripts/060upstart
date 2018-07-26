@@ -1,0 +1,27 @@
+#!/usr/bin/perl
+
+# 060upstart: Beat upstart into submission.
+
+use strict;
+use warnings;
+use Maint qw(:all);
+
+maint_init();
+
+my $initprefix = "/etc/init";
+
+my $disabled = maint_getconfig( "upstart:disable" ) // "";
+
+my @disabled = split( /\s*,\s*/, $disabled );
+
+foreach my $job (@disabled)
+{
+	if( -e "$initprefix/$job.conf" )
+	{
+		maint_info( "Disabling upstart job $job");
+		rename( "$initprefix/$job.conf",
+			"$initprefix/$job.conf.disabled" );
+	}
+}
+
+maint_exit();
