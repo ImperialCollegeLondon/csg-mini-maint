@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+
+# 088gconf: Make sure the system GConf configuration is sound.
+
+use strict;
+use warnings;
+use Maint qw(:all);
+
+maint_init();
+
+# Regenerate GCONF configuration using the standard distribution tooling.
+if( -x "/usr/bin/update-gconf-defaults" )
+{
+	system("/usr/bin/update-gconf-defaults 2>&1 > /dev/null");
+	system("/usr/bin/update-gconf-defaults --mandatory 2>&1 > /dev/null");
+}
+
+
+# nov2012 ldk: Also call 'dconf update' for Gnome 3.
+if( -x "/usr/bin/dconf" && -d "/etc/dconf/db" )
+{
+	system("/usr/bin/dconf update 2>&1 > /dev/null");
+}
+
+maint_exit();
