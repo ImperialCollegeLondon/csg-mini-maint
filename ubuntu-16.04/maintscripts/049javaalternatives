@@ -1,0 +1,42 @@
+#!/usr/bin/perl
+
+# 049javaalternatives: uses update-java-alternatives to set up
+#    java alternative-based systems.
+#    based on the more-general update-alternatives maint script.
+# Matt Johnson <mwj>
+
+use strict;
+use warnings;
+use Maint qw(:all);
+#use Maint::Run qw(:all);
+
+maint_init();
+
+my $configdir         = maint_getconfigdir();
+my $alternativesdir   = "$configdir/java-alternatives";
+
+my @lines = maint_compose( $alternativesdir );
+
+my $updatealt = "/usr/sbin/update-java-alternatives";
+
+# There should only be one choice
+maint_fatalerror( "No alternatives config found") unless @lines;
+
+my $javaalt = shift @lines;
+chomp $javaalt;
+
+# 'update-java-alternatives --list' returns non-zero result even if
+# successful so discard stderr output from maint_runcmd.
+my $stderr = "Hello.";
+my $knownalts = "";
+maint_runcmd([$updatealt, '--list', $javaalt],
+	0, LOG_DEBUG, undef, \$knownalts, \$stderr);
+
+#print "knowalts: $knownalts\n";
+
+maint_fatalerror( "'$javaalt' not a registered Java alternative" )
+	unless $knownalts =~ /^$javaalt/m;
+
+maint_runcmd([$updatealt, '--set', $javaalt], undef, LOG_DEBUG);
+
+maint_exit();
