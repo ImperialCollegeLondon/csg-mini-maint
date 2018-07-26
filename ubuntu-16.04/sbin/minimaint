@@ -463,7 +463,12 @@ foreach my $base (@scripts)
 	maint_debug( "Found maint path $scriptpath, file $scriptname, number=$num, base=$base");
 
 	# We want to run this
-	$scriptdirs{$num} = { path => $scriptpath, file => $scriptname, base => $base, run => 1 };
+	$scriptdirs{$num} = {
+		path => $scriptpath,
+		file => $scriptname,
+		base => $base,
+		run => 1
+	};
 
 	# should we exclude any scripts due to runwhen/runon constraints?
 	#unless( maint_runwhen($scriptname, $mode) )
@@ -483,7 +488,8 @@ foreach my $base (@scripts)
 
 # Run all requested on local machine
 # Note, numeric sorting, not string order
-my @runscripts = sort { $a <=> $b } grep { $scriptdirs{$_}->{run} } keys %scriptdirs;
+my @runscripts = sort { $a <=> $b }
+		      grep { $scriptdirs{$_}->{run} } keys %scriptdirs;
 
 # Generate list of scripts that will be run and announce.
 my $lists = join(" ", map { $scriptdirs{$_}->{base} } @runscripts );
