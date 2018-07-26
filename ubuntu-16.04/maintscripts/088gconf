@@ -11,6 +11,7 @@ maint_init();
 # Regenerate GCONF configuration using the standard distribution tooling.
 if( -x "/usr/bin/update-gconf-defaults" )
 {
+	maint_info( "running update-gconf-defaults" );
 	system("/usr/bin/update-gconf-defaults 2>&1 > /dev/null");
 	system("/usr/bin/update-gconf-defaults --mandatory 2>&1 > /dev/null");
 }
@@ -19,6 +20,7 @@ if( -x "/usr/bin/update-gconf-defaults" )
 # nov2012 ldk: Also call 'dconf update' for Gnome 3.
 if( -x "/usr/bin/dconf" && -d "/etc/dconf/db" )
 {
+	maint_info( "running dconf update" );
 	system("/usr/bin/dconf update 2>&1 > /dev/null");
 }
 
