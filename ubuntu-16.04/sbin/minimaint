@@ -403,7 +403,7 @@ if( maint_getattr( "list" ) == 1 )
 	maint_usage() if @scripts;
 
 	# Scan all scripts
-	foreach my $sc (@scriptinfo)
+	foreach my $sc (sort { $a->{num} <=> $b->{num} } @scriptinfo)
 	{
 		my $num = $sc->{num};
 		my $base = $sc->{base};
@@ -441,7 +441,7 @@ if( @scripts == 0 )
 	}
 }
 
-maint_info( "scripts to run: ". join(' ',@scripts) ) if @scripts;
+maint_info( "Scripts to run: ". join(' ',@scripts) ) if @scripts;
 
 my %scriptsbybasename = map { $_->{base} => $_ } @scriptinfo;
 
