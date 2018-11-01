@@ -1,0 +1,285 @@
+#!/usr/bin/perl
+#
+# update-disk-uids:
+# Given a directory (often /) of a system that contains system uids and gids
+# in the "DoC user range" of 100..63999, and the /etc/passwd and /etc/group
+# files of that system, attempt to find corresponding sub-100 free uids and
+# gids, and then find all files in the given directory that are owned or
+# group-owned by any of the clashing uids or gids, and change their ownership.
+#
+# goal: every file in the given directory is still owned by the correct
+#	user and group, with unaltered permissions (even setuid) but the
+#	numeric uids and gids of clashing users and groups have mysteriously
+#	changed.  kind of "renumber" for uids and gids..
+#
+# David McBride <dwm@doc.ic.ac.uk> and
+# Duncan White <d.white@imperial.ac.uk>
+# GPLv2
+
+use strict;
+use warnings;
+use Data::Dumper;
+use File::Find;
+use Fcntl ':mode';
+
+die "Usage: update-disk-uids\n" unless @ARGV == 0;
+
+my $topdir     = "/";
+my $passwdfile = "/etc/passwd";
+my $groupfile  = "/etc/group";
+
+
+#
+# read_colonsep( $filename, $callback );
+#	Read a colon separated file $filename, calling the given
+#	$callback->( @field ) for each record.
+#
+sub read_colonsep($$)
+{
+	my( $filename, $callback ) = @_;
+	open( my $fh, '<', $filename ) || return ();
+	while( <$fh> )
+	{
+		chomp;
+		my @x = split( /:/, $_ );
+		$callback->( @x );
+	}
+	close( $fh );
+}
+
+
+#
+# my $ok = copy_colonsep( $infilename, $outfilename, $callback );
+#	Make a modified copy (called $outfilename) of a colon
+#	separated file $infilename, reading every colon separated
+#	record, splitting it into fields, modifying the fields via
+#	@field = $callback->( @field ), then writing out the modified
+#	records to $outfilename.  Return 1 if we successfully copied
+#	the file, 0 otherwise.
+#
+sub copy_colonsep($$$)
+{
+	my( $infilename, $outfilename, $callback ) = @_;
+	open( my $infh, '<', $infilename ) || return 0;
+	open( my $outfh, '>', $outfilename ) || (close($infh) && return 0);
+	while( <$infh> )
+	{
+		chomp;
+		my @x = split( /:/, $_ );
+		@x = $callback->( @x );
+		$_ = join(":", @x ). "\n";
+		print $outfh $_;
+	}
+	close( $infh );
+	close( $outfh );
+	return 1;
+}
+
+
+#
+# my @ids = find_ids_in_range( $idmap, $low, $high [, $in default 1] );
+#	Given an idmap (key: uid/gid, value: corresponding user/group name)
+#	find and return a list of all ids in the numeric range $low..$high
+#	that ARE present in the idmap (if $in is true) or ARE NOT present
+#	if $in is false; if $in is ABSENT, it's true.
+#
+sub find_ids_in_range ($$$;$)
+{
+	my( $idmap, $low, $high, $in ) = @_;
+	$in //= 1;	# default 1
+	my @result;
+	for( my $i = $low; $i <= $high; $i++ )
+	{
+		push @result, $i if $in == ($idmap->{$i}?1:0);
+	}
+	return @result;
+}
+
+
+my %g2g;	# gid -> groupname
+read_colonsep( $groupfile,
+	sub { $g2g{$_[2]} = $_[0] } );
+keys %g2g || die "can't read $groupfile\n";
+#print Dumper \%g2g;
+
+my %u2u;	# uid -> username
+my %u2g;	# uid -> primary group of that user
+read_colonsep( $passwdfile,
+	sub {
+		$u2u{$_[2]} = $_[0];
+		$u2g{$_[2]} = $_[3];
+	} );
+keys %u2u && keys %u2g || die "can't read $passwdfile\n";
+
+#print Dumper \%u2u;
+#print Dumper \%u2g;
+
+# test.. lookup one user and corresponding group
+#my $uid = 5;
+#my $username = $u2u{$uid};
+#print "debug: username($uid) = $username\n";
+#my $gid = $u2g{$uid};
+#print "debug: primarygidof($uid) = $gid\n";
+#my $group = $g2g{$gid};
+#print "debug: groupname($gid) = $group\n";
+
+my @baduids = find_ids_in_range( \%u2u, 100, 63999 );
+#print Dumper \@baduids;
+
+my @freeuids = find_ids_in_range( \%u2u, 30, 99, 0 );
+#print Dumper \@freeuids;
+
+my @badgids = find_ids_in_range( \%g2g, 100, 63999 );
+#print Dumper \@badgids;
+
+my @freegids = find_ids_in_range( \%g2g, 30, 99, 0 );
+#print Dumper \@freegids;
+
+my $bad  = @baduids;
+my $free = @freeuids;
+die "update-disk-uids: $bad bad uids, only $free free uids<100\n"
+	if $free < $bad;
+
+$bad  = @badgids;
+$free = @freegids;
+die "update-disk-uids: $bad bad gids, only $free free gids<100\n"
+	if $free < $bad;
+
+my %baduidmap;
+foreach my $bad (@baduids)
+{
+	my $free = shift @freeuids;
+	#print "map uid $bad to $free\n";
+	$baduidmap{$bad} = $free;
+}
+my %badgidmap;
+foreach my $bad (@badgids)
+{
+	my $free = shift @freegids;
+	#print "map gid $bad to $free\n";
+	$badgidmap{$bad} = $free;
+}
+
+#exit 0;
+
+# find all files (including directories) and record:
+#	- %specialmodes: the mode (permissions) of any setuid and setgid files.
+#	- %baduid2pathlist: the full paths of any files owned by a baduid
+#	  (data structure: uid->list of paths)
+#	- %badgid2pathlist: the full paths of any files group-owned by a badgid
+#	  (data structure: gid->list of paths)
+#	
+my %specialmodes;
+my %badgid2pathlist;
+
+my %change;		# information about all paths needing changing,
+			# hash from path -> record (uid and gid fields)
+
+sub wanted
+{
+	my($dev, $ino, $mode, $nlink, $uid, $gid) = lstat($_);
+
+	if( $dev != $File::Find::topdev)
+	{
+		$File::Find::prune = 1;
+		return;
+	}
+	$mode &= 07777;
+	my $is_setuid = $mode & S_ISUID;
+	my $is_setgid = $mode & S_ISGID;
+	my $is_baduid = $baduidmap{$uid} ? 1 : 0;
+	my $is_badgid = $badgidmap{$gid} ? 1 : 0;
+
+	if( ($is_setuid || $is_setgid) && ( $is_baduid || $is_badgid ) )
+	{
+		$specialmodes{$File::Find::name} = $mode;
+		#printf "special mode of $File::Find::name = %4o\n", $mode;
+	}
+	if( $is_baduid )
+	{
+		my $newuid = $baduidmap{$uid};
+		my $path   = $File::Find::name;
+		#print "bad uid $uid, new uid $newuid, path $path\n";
+		$change{$path} ||= {};
+		$change{$path}->{uid} = $newuid;
+	}
+	if( $is_badgid )
+	{
+		my $newgid = $badgidmap{$gid};
+		my $path   = $File::Find::name;
+		#my $aref = ($badgid2pathlist{$gid} ||= []);
+		#push @$aref, $path;
+		#print "adding $path to list of paths with bad gid=$gid\n";
+		#print "bad gid $gid, new gid $newgid, path $path\n";
+		$change{$path} ||= {};
+		$change{$path}->{gid} = $newgid;
+	}
+}
+
+find( \&wanted, $topdir );
+
+#exit 0;
+
+#exit 0;
+
+# find files group-owned by bad gids and change them to the
+# corresponding free gid
+#foreach my $badgid (sort { $a <=> $b } keys(%badgidmap))
+#{
+#	my $newgid = $badgidmap{$badgid};
+#	my $list   = $badgid2pathlist{$badgid};
+#	#print "bad gid $badgid, list of paths: ". Dumper $list;
+#	foreach my $path (@$list)
+#	{
+#		#print "bad gid $badgid, new gid $newgid, path $path\n";
+#		$change{$path} ||= {};
+#		$change{$path}->{gid} = $newgid;
+#	}
+#}
+
+#print Dumper \%change;
+
+my $tarcmd = "tar czf /tmp/backup_changed.tgz ";
+$tarcmd   .= join( " ", map { "'$_'" } sort(keys(%change)) );
+print "$tarcmd\n" if keys(%change);
+
+foreach my $path (sort(keys(%change)))
+{
+	my $record = $change{$path};
+	my $uid    = $record->{uid} || -1;
+	my $gid    = $record->{gid} || -1;
+	print "chown $uid.$gid $path\n" if $uid != -1 && $gid != -1;
+	print "chown $uid $path\n"      if $uid != -1 && $gid == -1;
+	print "chgrp $gid $path\n"      if $uid == -1 && $gid != -1;
+	my $mode = $specialmodes{$path};
+	if( $mode )
+	{
+		printf "chmod %4o $path\n", $mode;
+	}
+}
+print "mv /etc/passwd /etc/passwd.old\n";
+print "mv /etc/passwd.tmp /etc/passwd\n";
+print "mv /etc/group /etc/group.old\n";
+print "mv /etc/group.tmp /etc/group\n";
+
+my $ok = copy_colonsep( $passwdfile, "$passwdfile.tmp",
+	sub {
+		my $uid = $_[2];
+		$uid = $baduidmap{$uid} if defined $baduidmap{$uid};
+		my $gid = $_[3];
+		$gid = $badgidmap{$gid} if defined $badgidmap{$gid};
+		$_[2] = $uid;
+		$_[3] = $gid;
+		return @_;
+	} );
+die "copy of $passwdfile to $passwdfile.tmp failed\n" unless $ok;
+
+$ok = copy_colonsep( $groupfile, "$groupfile.tmp",
+	sub {
+		my $gid = $_[2];
+		$gid = $badgidmap{$gid} if defined $badgidmap{$gid};
+		$_[2] = $gid;
+		$_[3] //= "";
+		return @_;
+	} );
+die "copy of $groupfile to $groupfile.tmp failed\n" unless $ok;

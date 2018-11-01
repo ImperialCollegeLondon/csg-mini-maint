@@ -1,0 +1,64 @@
+This component is the bootstrapping code - having written the first version
+of minimaint (in ../csg-mini-maint), I thought about how to best get minimaint
+to start on a new freshly installed Ubuntu 16.04 machine (not necessarily in
+DoC).
+
+I set up a fresh minimaint site config for "this site", in
+../csg-mini-maint-dcw-config and a public git repo:
+https://github.com/ImperialCollegeLondon/csg-mini-maint-dcw-config.git
+
+Note that this is entirely separate from the minimaint source code, which is
+another git repo.
+
+Then, I thought about it and realised that the BEGIN code from sbin/minimaint
+is pretty much what's needed for the bootstrapping, so I copied it here,
+tweaked it a bit, and thus made the bootstrap script "bootstrap/bootstrap".
+
+I added code to it that:
+
+- installs a few prerequisite packages
+
+- then reads the one-line bootstrap/config.url file telling it where to
+  fetch the site config git repo
+
+- then lets the user (for now) choose the machine's instance hostname
+  (in order to determine, via the site config repo's hostclass file,
+  what configuration should apply to this machine).
+
+- then it clones the given site config repo via git into /etc/minimaint,
+
+- then it reads the phase1 config file from inside that cloned repo,
+  determines where to fetch minimaint itself from (a second git repo - the
+  "gitrepo" property in /etc/minitmaint/phase1), and goes off and clones it.
+
+- it then refreshes the /sbin/minimaint symlink to point at the cached
+  CACHEDIR/ubuntu-16.04/sbin/minimaint script
+
+- and finally runs "minimaint hello" to show that it works.
+
+Did this mainly on Fri 6th July, although added more polish on Monday 9th
+and Tuesday 10th too.  Probably only 100 lines of fresh code, as most was a
+copy of parts of sbin/minimaint so doesn't really count:-)
+
+Added a Makefile to tar up the bootstrap directory (containing only the
+2 files: config.url and bootstrap) and install it temporarily in
+https://www.doc.ic.ac.uk/~dcw/bootstrap.tgz.
+
+Now, to install minimaint, as root on a new Ubuntu 16.04 machine, all you do
+is:
+
+cd /tmp
+wget https://www.doc.ic.ac.uk/~dcw/bootstrap16.04.tgz
+tar xzf bootstrap.tgz
+cd bootstrap
+
+[check the config.url file contains the correct URL of your site repo,
+ now's the time to change this to another URL if you want]
+
+./bootstrap
+
+For 18.04, do:
+
+	wget https://www.doc.ic.ac.uk/~dcw/bootstrap16.04.tgz
+
+instead..
