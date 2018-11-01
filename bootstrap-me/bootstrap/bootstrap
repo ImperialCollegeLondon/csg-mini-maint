@@ -145,11 +145,29 @@ sub check_os_version()
 
 # --------------- minimaint-bootstrap for Ubuntu -------------------
 
+print "\n1. Freshening all packages\n";
+system( "apt-get update" );
+system( "apt-get dist-upgrade" );
+system( "apt autoremove" );
 
-print "\n1. Installing some prerequisite packages\n";
-system( "apt-get install autofs git aptitude libfile-slurp-perl libunix-syslog-perl libipc-run3-perl libjson-perl libfilesys-statvfs-perl perl-doc" );
+print "\n2. copying adduser.conf and login.defs to /etc\n";
+system( "cp adduser.conf login.defs /etc" );
 
-print "\n2. Reading site config repo URL from config.url\n";
+print "\n3. should I renumber uids in passwd and group? [y/n] ";
+my $yesno = <STDIN>;
+chomp $yesno;
+if( $yesno =~ /^y/i )
+{
+	system( "./updatediskuids | sh" );
+
+	print "\n3a. checking that renumber has worked:\n";
+	system( "./updatediskuids" );
+}
+
+print "\n4. Installing some prerequisite packages\n";
+system( "apt-get install autofs git aptitude libfile-slurp-perl libunix-syslog-perl libipc-run3-perl libjson-perl libfilesys-statvfs-perl perl-doc pbzip2" );
+
+print "\n5. Reading site config repo URL from config.url\n";
 open( my $infh, '<', "config.url" ) || die "can't open config.url\n";
 my $confurl = <$infh>;
 chomp $confurl;
@@ -157,7 +175,7 @@ close( $infh );
 
 print "  site config repo is: $confurl\n";
 
-print "\n3. Enter the hostname [or return to leave hostname as is]: ";
+print "\n6. Enter the hostname [or return to leave hostname as is]: ";
 
 my $hostname = <STDIN>;
 chomp $hostname;
@@ -177,7 +195,7 @@ if( $hostname )
 	print "Have set hostname to $hostname\n";
 }
 
-print "\n4. Cloning the site config git repo from $confurl into /etc:\n";
+print "\n7. Cloning the site config git repo from $confurl into /etc:\n";
 
 my $conflinkdest = "/etc/minimaint";
 $confurl =~ m|/([^/]+)\.git$|;
@@ -186,27 +204,27 @@ my $confdir = $1;
 chdir( "/etc" );
 fullclone( $confurl, $confdir );
 
-print "\n5. Symlinking $confdir to $conflinkdest\n";
+print "\n8. Symlinking $confdir to $conflinkdest\n";
 unlink( $conflinkdest );
 symlink( $confdir, $conflinkdest );
 
-print "\n6. Reading phase1 configuration information from /etc/minimaint\n";
+print "\n9. Reading phase1 configuration information from /etc/minimaint\n";
 loadphase1config();
 
-print "\n7. Check that we're running on the correct OS!\n";
+print "\n10. Check that we're running on the correct OS!\n";
 check_os_version();
 
-print "\n8. Cloning minimaint from $gitrepo into $cachedir\n";
+print "\n11. Cloning minimaint from $gitrepo into $cachedir\n";
 
 loadcache( $gitrepo, $cachedir );
 
-print "\n9. Symlinking minimaint itself into /sbin/minimaint\n";
+print "\n12. Symlinking minimaint itself into /sbin/minimaint\n";
 my $minimaintpath = "$cachedir/$distribution/sbin/minimaint";
 my $dest          = "/sbin/minimaint";
 unlink( $dest );
 symlink( $minimaintpath, $dest );
 
-print "\n10. running 'minimaint hello' as a test:\n".
+print "\n13. running 'minimaint hello' as a test:\n".
 unlink( "../bootstrap.tgz" );
 system( "minimaint hello" );
 
