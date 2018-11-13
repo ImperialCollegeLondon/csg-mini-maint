@@ -44,11 +44,11 @@ Added a Makefile to tar up the bootstrap directory (containing only the
 2 files: config.url and bootstrap) and install it temporarily in
 https://www.doc.ic.ac.uk/~dcw/bootstrap.tgz.
 
-Now, to install minimaint, as root on a new machine, all you do is:
+Now, to install minimaint, as root on a new 18.04 machine, all you do is:
 
 cd /tmp
-wget https://www.doc.ic.ac.uk/~dcw/bootstrap.tgz
-tar xzf bootstrap.tgz
+wget https://www.doc.ic.ac.uk/~dcw/bootstrap18.04.tgz
+tar xzf bootstrap18.04.tgz
 cd bootstrap
 
 [check the config.url file contains the correct URL of your site repo,
