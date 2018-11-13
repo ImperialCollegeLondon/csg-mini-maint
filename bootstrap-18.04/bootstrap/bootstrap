@@ -218,16 +218,23 @@ print "\n11. Cloning minimaint from $gitrepo into $cachedir\n";
 
 loadcache( $gitrepo, $cachedir );
 
-print "\n12. Symlinking minimaint itself into /sbin/minimaint\n";
+print "\n12. Symlinking minimaint itself into /sbin/{minimaint,mm,maint}\n";
 my $minimaintpath = "$cachedir/$distribution/sbin/minimaint";
 my $dest          = "/sbin/minimaint";
 unlink( $dest );
 symlink( $minimaintpath, $dest );
+my $mmdest          = "/sbin/mm";
+symlink( $minimaintpath, $mmdest );
+my $maintdest          = "/sbin/maint";
+symlink( $minimaintpath, $maintdest );
 
 print "\n13. running 'minimaint hello' as a test:\n".
 unlink( "../bootstrap.tgz" );
 system( "minimaint hello" );
 
+print "\n14. disabling 'plymouth':\n".
+system( qq(perl -pi -e 's/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"/GRUB_CMDLINE_LINUX_DEFAULT=""/' /etc/default/grub) ); 
+system( "update-grub" );
 exit 0;
 
 
